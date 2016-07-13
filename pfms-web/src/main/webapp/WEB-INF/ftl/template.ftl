@@ -17,14 +17,14 @@
                 <ul class="nav navbar-nav">
                     <li <#if active=="001">class="active"</#if>><a href="#"><@spring.message 'nav.welcome'/></a></li>
                     <li <#if active=="002">class="active"</#if>><a
-                            href="/account/show.htm"><@spring.message 'nav.accounting'/></a></li>
+                            href="/account/show"><@spring.message 'nav.accounting'/></a></li>
                     <li <#if active=="003">class="active"</#if>><a href="#"><@spring.message 'nav.reports'/></a></li>
                     <li <#if active=="004">class="active"</#if>><a href="#"><@spring.message 'nav.download'/></a></li>
                     <li class="dropdown">
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
                            aria-expanded="false"><@spring.message 'nav.settings'/><span class="caret"></span></a>
                         <ul class="dropdown-menu">
-                            <li><a href="/setting/proSet.htm"><@spring.message 'nav.settings.proSet'/></a></li>
+                            <li><a href="/setting/proSet"><@spring.message 'nav.settings.proSet'/></a></li>
                             <li role="separator" class="divider"></li>
                             <li><a href="#"><@spring.message 'nav.settings.budgetSet'/></a></li>
                             <li role="separator" class="divider"></li>

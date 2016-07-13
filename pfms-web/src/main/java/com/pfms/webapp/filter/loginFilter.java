@@ -12,7 +12,7 @@ import java.io.IOException;
 /**
  * Created by Fred on 16/5/22.
  */
-public class loginFilter extends OncePerRequestFilter {
+public class LoginFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, FilterChain filterChain) throws ServletException, IOException {
         if(isStaticResource(httpServletRequest) || isExclusionRequest(httpServletRequest)){
@@ -20,7 +20,7 @@ public class loginFilter extends OncePerRequestFilter {
         }else{
             Authentication authentication = (Authentication) httpServletRequest.getSession().getAttribute("session_authentication");
             if(authentication == null || authentication.isValid() == true){
-                httpServletResponse.sendRedirect("http://127.0.0.1:8081/main/redirectLogin.htm");
+                httpServletResponse.sendRedirect("http://127.0.0.1:8083/");
             }
             else{
                 filterChain.doFilter(httpServletRequest,httpServletResponse);
@@ -30,11 +30,11 @@ public class loginFilter extends OncePerRequestFilter {
 
     private boolean isStaticResource(HttpServletRequest request){
         String servletpath = request.getServletPath();
-        if(servletpath.startsWith("/css/")||
-                servletpath.startsWith("/JavaScript/")||
-                servletpath.startsWith("/images/")||
-                servletpath.endsWith("/favicon.ico")||
-                servletpath.startsWith("/fonts/")){
+        if(servletpath.startsWith("/css")
+                ||servletpath.startsWith("/JavaScript")
+                ||servletpath.startsWith("/images")
+                ||servletpath.endsWith("/favicon.ico")
+                ||servletpath.startsWith("/fonts")){
             return true;
         }else{
             return false;
@@ -43,7 +43,10 @@ public class loginFilter extends OncePerRequestFilter {
 
     private boolean isExclusionRequest(HttpServletRequest request){
         String servletPath = request.getServletPath();
-        if(servletPath.startsWith("/main/")||servletPath.endsWith("/favicon.ico")){
+        if(servletPath.equals("/")
+                ||servletPath.startsWith("/register")
+                ||servletPath.startsWith("/login")
+                ||servletPath.startsWith("/registerCheck")){
             return true;
         }else{
             return false;

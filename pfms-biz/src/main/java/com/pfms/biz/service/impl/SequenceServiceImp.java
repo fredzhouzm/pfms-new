@@ -20,7 +20,6 @@ import java.util.List;
 /**
  * Created by Fred on 2016/1/3.
  */
-@Scope("singleton")
 @Service
 public class SequenceServiceImp implements ISequenceService {
 
@@ -47,8 +46,8 @@ public class SequenceServiceImp implements ISequenceService {
 
     @Autowired
     SequenceMapper sequenceMapper;
-    @Autowired
-    PersonalUtil personalUtil;
+
+    PersonalUtil personalUtil = new PersonalUtil();
 
     //取各种ID，现有包括记账单据ID，一级科目ID和二级科目ID
     @Transactional

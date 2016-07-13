@@ -24,7 +24,7 @@
 </head>
 <body>
 <div id="loginDiv">
-    <form action="login.htm" method="post">
+    <form action="/login" method="post">
         <div style="color: #ff0000" class="alert alert-error">
         <@spring.bind "user.loginName"/><@spring.showErrors ""/>
                 <@spring.bind "user.password"/><@spring.showErrors ""/>
@@ -53,7 +53,7 @@
 <script type="text/javascript" src="../JavaScript/bootstrap.min.js"></script>
 <script type="text/javascript">
     function redirect() {
-        window.location = "register.htm";
+        window.location = "/register";
     }
 </script>
 </html>

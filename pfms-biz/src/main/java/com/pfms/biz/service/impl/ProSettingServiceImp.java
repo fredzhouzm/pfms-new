@@ -21,7 +21,6 @@ import java.util.List;
 /**
  * Created by Fred on 2016/1/3.
  */
-@Scope("singleton")
 @Service
 public class ProSettingServiceImp implements IProSettingService {
 

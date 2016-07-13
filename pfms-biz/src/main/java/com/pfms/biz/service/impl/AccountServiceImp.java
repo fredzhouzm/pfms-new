@@ -17,7 +17,6 @@ import java.util.*;
 /**
  * Created by fred on 2016/01/31.
  */
-@Scope("singleton")
 @Service
 public class AccountServiceImp implements IAccountService {
 

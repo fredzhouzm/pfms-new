@@ -28,5 +28,11 @@ public class Constants {
     public final static int FORM_INCVAL_HALF = 5;
     public final static int PRO_ONE_INCVAL_HALF = 5;
     public final static int PRO_TWO_INCVAL_HALF = 5;
+    public final static String USER_FIRST_LOGIN_Y = "1";
+    public final static String USER_FIRST_LOGIN_N = "2";
+    public final static String USER_TYPE_NORMAL = "1";
+    public final static String USER_TYPE_ADMIN = "2";
+    public final static String PRO_TYPE_INCOME = "1";
+    public final static String PRO_TYPE_EXPEND = "2";
 
 }

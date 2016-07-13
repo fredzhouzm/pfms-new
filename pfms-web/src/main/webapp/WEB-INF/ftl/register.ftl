@@ -25,7 +25,7 @@
 </head>
 <body>
 <div id="registerDiv">
-    <form class="form-horizontal" action="registerCheck.htm" method="post">
+    <form class="form-horizontal" action="/registerCheck" method="post">
         <div style="color: #ff0000" class="alert alert-error">
         <@spring.bind "user.loginName"/><@spring.showErrors ""/>
             <@spring.bind "user.password"/><@spring.showErrors ""/>
@@ -86,7 +86,7 @@
             <div class="col-sm-8">
                 <div calss="form-group">
                     <div id="datetimepicker" class="input-group date form_date">
-                        <input type="text" value="${(user.birthdate)}" class="form-control" name="birthdate"
+                        <input type="text" value="<#if user.birthdate??>${(user.birthdate)?string("yyyy-MM-dd")}</#if>" class="form-control" name="birthdate"
                                id="registerBirthdate" placeholder="<@spring.message 'plahdr.birthDate'/>" readonly
                                required></input>
                         <span class="input-group-addon"><span class="glyphicon glyphicon-remove"></span></span>

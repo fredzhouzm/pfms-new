@@ -9,8 +9,6 @@ import java.text.DecimalFormat;
 /**
  * Created by Fred on 2015/12/7.
  */
-@Scope("singleton")
-@Service
 public class PersonalUtil {
 
     //金额数字转换成String类型数据

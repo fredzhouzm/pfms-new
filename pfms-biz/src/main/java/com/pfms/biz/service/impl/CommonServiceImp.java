@@ -10,7 +10,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Scope;
+import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -20,7 +22,6 @@ import java.util.List;
 /**
  * Created by Fred on 2015/12/7.
  */
-@Scope("singleton")
 @Service
 public class CommonServiceImp implements ICommonService {
 
@@ -53,6 +54,7 @@ public class CommonServiceImp implements ICommonService {
     }
 
     @Override
+    @Transactional
     public void insertPfmsUser(PfmsUser pfmsUser) {
         logger.info("开始方法：向数据表插入用户相关数据[" + pfmsUser.getLoginName() + "," + pfmsUser.getName() + "," + pfmsUser.getGender() + "," + pfmsUser.getUserType() + "," + pfmsUser.getBirthDate() + "," + pfmsUser.getMailAddress() + "]");
         pfmsUser.setPassword(SecurOp.sha1(pfmsUser.getPassword()));
