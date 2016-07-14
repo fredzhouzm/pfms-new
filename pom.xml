@@ -47,6 +47,7 @@
         <validator.version>5.2.4.Final</validator.version>
         <spring.session.redis>1.2.0.RELEASE</spring.session.redis>
         <joda.time>2.9.2</joda.time>
+        <alibaba.json>1.2.8</alibaba.json>
         <jetty.servlet>9.3.5.v20151012</jetty.servlet>
     </properties>
 
@@ -246,6 +247,11 @@
                 <groupId>joda-time</groupId>
                 <artifactId>joda-time</artifactId>
                 <version>${joda.time}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.alibaba</groupId>
+                <artifactId>fastjson</artifactId>
+                <version>${alibaba.json}</version>
             </dependency>
             <dependency>
                 <groupId>org.eclipse.jetty</groupId>

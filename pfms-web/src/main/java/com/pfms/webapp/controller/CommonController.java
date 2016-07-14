@@ -69,7 +69,7 @@ public class CommonController {
             return mav;
         }
         if (!commonService.checkUserNameIsExist(user.getLoginName())) {
-            logger.info("用户不存在，返回登录页面");
+            logger.info("用户["+user.getLoginName()+"]不存在，返回登录页面");
             bindingResult.rejectValue("loginName", "error.notExist.login");
             mav.setViewName("login");
             mav.addObject("user", user);
@@ -78,7 +78,7 @@ public class CommonController {
         PfmsUser pfmsUser = commonService.getPfmsUser(user.getLoginName(), Constants.BY_LOGIN_NAME);
         Boolean isCorrectPwd = commonService.isCorrectPwd(user.getPassword(), pfmsUser.getPassword());
         if (isCorrectPwd) {
-            logger.info("密码检查通过");
+            logger.info("用户["+user.getLoginName()+"]密码检查通过");
             Authentication authentication = new Authentication();
             authentication.setLoginName(pfmsUser.getLoginName());
             authentication.setNickName(pfmsUser.getName());
@@ -87,10 +87,10 @@ public class CommonController {
             authentication.setValid(false);
             authentication.setMyActions(new HashSet<String>());
             request.getSession(true).setAttribute("session_authentication", authentication);
-            logger.info("用户登录成功，重定向到欢迎页面");
+            logger.info("用户["+user.getLoginName()+"]登录成功，重定向到欢迎页面");
             return new ModelAndView("redirect:/welcome");
         } else {
-            logger.info("密码检查不通过，返回登录页面");
+            logger.info("用户["+user.getLoginName()+"]密码检查不通过，返回登录页面");
             bindingResult.rejectValue("password", "error.incorrect.password");
             mav.setViewName("login");
             mav.addObject("user", user);
@@ -139,7 +139,7 @@ public class CommonController {
             authentication.setValid(false);
             authentication.setMyActions(new HashSet<String>());
             httpSession.setAttribute("session_authentication", authentication);
-            logger.info("用户注册成功，重定向到欢迎页面");
+            logger.info("用户["+user.getLoginName()+"]注册成功，重定向到欢迎页面");
             return new ModelAndView("redirect:/welcome");
         }
     }

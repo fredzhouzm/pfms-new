@@ -3,12 +3,15 @@
  */
 package com.pfms.webapp.controller;
 
+import com.alibaba.fastjson.JSON;
+import com.pfms.biz.model.ProOneBO;
 import com.pfms.biz.service.IProSettingService;
 import com.pfms.dal.mybatis.model.PfmsUsageLevelOne;
 import com.pfms.dal.mybatis.model.PfmsUsageLevelTwo;
 import com.pfms.dal.mybatis.model.RealStatistics;
 import com.pfms.util.Constants;
 import com.pfms.util.PersonalUtil;
+import com.pfms.webapp.jsonResponse.*;
 import com.pfms.webapp.model.Authentication;
 import com.pfms.webapp.model.LevelOneProject;
 import com.pfms.webapp.model.LevelTwoProject;
@@ -16,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -42,15 +46,13 @@ public class ProSettingController {
     @Autowired
     public IProSettingService proSettingService;
 
-    private PersonalUtil personalUtil = new PersonalUtil();
-
     @RequestMapping(value = "/proSet")
     public ModelAndView proSetting(HttpServletRequest request) {
 
         //获取当前用户
         Authentication authentication = (Authentication) request.getSession().getAttribute("session_authentication");
         int userId = authentication.getId();
-        logger.info("查询用户"+ userId +"科目设置信息");
+        logger.info("查询用户["+ authentication.getLoginName() +"]的科目设置信息");
 
         ModelAndView modelAndView = new ModelAndView();
 
@@ -70,46 +72,35 @@ public class ProSettingController {
     //新增一级科目
     @RequestMapping(value = "/addProOne.json", method = RequestMethod.POST)
     @ResponseBody
-    public Map addProOne(@RequestBody Map map, HttpServletRequest request) {
-        logger.info("来时新增一级科目！");
-
+    public String addProOne(@RequestBody Map map, HttpServletRequest request) {
         //获取用户信息
         Authentication authentication = (Authentication) request.getSession().getAttribute("session_authentication");
-
         //解析并判断JSON
         String proOneNameAdd = (String) map.get("proOneNameAdd");
-        proOneNameAdd = proOneNameAdd.trim();
         String type = (String) map.get("proOneType");
-        type = type.trim();
-        Map jsonMap = new HashMap();
-        if (personalUtil.isBlankOrNull(proOneNameAdd) || personalUtil.isBlankOrNull(type)) {
-            jsonMap.put("opstatus", "fail");
-            jsonMap.put("optype", "");
-            jsonMap.put("opid", "");
-            jsonMap.put("opname", "");
-            jsonMap.put("oprealMmount", "");
-            jsonMap.put("opbudgetMmount", "");
+        logger.info("开始新增一级科目,科目名称为：["+proOneNameAdd+"]，新增科目的类型为：["+type+"]");
+        AddProOneResponse response = new AddProOneResponse();
+        if (StringUtils.isEmpty(proOneNameAdd.trim()) || StringUtils.isEmpty(type.trim())) {
+            logger.info("新增一级科目失败，因为数据检查失败");
+            response.setOpstatus(Constants.RESPONSE_FAILURE);
         } else {
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyyMM");
-            String today = sdf.format(new Date());
-            PfmsUsageLevelOne pfmsUsageLevelOne = proSettingService.insertProOneWithPara(proOneNameAdd, type, authentication.getId());
-            RealStatistics realStatisticses = proSettingService.getOrInsertMonthBudget(pfmsUsageLevelOne.getId(),today,pfmsUsageLevelOne.getMonthbudget());
-            jsonMap.put("opstatus", "success");
-            jsonMap.put("optype", pfmsUsageLevelOne.getType());
-            jsonMap.put("opid", pfmsUsageLevelOne.getId());
-            jsonMap.put("opname", pfmsUsageLevelOne.getName());
-            jsonMap.put("oprealMmount", personalUtil.bigDecimalToString(realStatisticses.getRealamount()));
-            jsonMap.put("opbudgetMmount", personalUtil.bigDecimalToString(realStatisticses.getBudget()));
+            String today = PersonalUtil.getDateStr(Constants.DATETIME_FORMAT_MONTH);
+            ProOneBO proOneBO = proSettingService.insertProOneAndBudget(proOneNameAdd, type, authentication.getId(), today);
+            logger.info("新增一级科目成功");
+            response.setOpstatus(Constants.RESPONSE_SUCCESS);
+            response.setOptype(proOneBO.getType());
+            response.setOpid(proOneBO.getId());
+            response.setOpname(proOneBO.getName());
+            response.setOprealMmount(PersonalUtil.bigDecimalToString(proOneBO.getRealAmount()));
+            response.setOpbudgetMmount(PersonalUtil.bigDecimalToString(proOneBO.getBudget()));
         }
-        return jsonMap;
+        return JSON.toJSONString(response);
     }
 
     //新增二级科目
     @RequestMapping(value = "/addProTwo.json", method = RequestMethod.POST)
     @ResponseBody
-    public Map addProTwo(@RequestBody Map map, HttpServletRequest request) {
-        logger.info("开始新增二级科目！");
-
+    public String addProTwo(@RequestBody Map map, HttpServletRequest request) {
         //获取用户信息
         Authentication authentication = (Authentication) request.getSession().getAttribute("session_authentication");
 
@@ -118,35 +109,21 @@ public class ProSettingController {
         String type = (String) map.get("proTwoType");
         String proOneId = (String) map.get("proOneId");
         String budget = (String) map.get("proTwoBudgetAdd");
-        Map jsonMap = new HashMap();
-        if (personalUtil.isBlankOrNull(proTwoNameAdd) || personalUtil.isBlankOrNull(type) || personalUtil.isBlankOrNull(proOneId)) {
-            jsonMap.put("opstatus", "fail");
-            jsonMap.put("optype", "");
-            jsonMap.put("opparentid", "");
-            jsonMap.put("opid", "");
-            jsonMap.put("opname", "");
-            jsonMap.put("opparentbudgetamount", "");
-            jsonMap.put("opparentrealamount", "");
-            jsonMap.put("opbudgetamount", "");
-            jsonMap.put("oprealamount", "");
+        logger.info("开始新增二级科目，科目名称为["+ proTwoNameAdd +"]，新增科目类型为["+ type +"]，新增科目父级科目ID为["+ proOneId +"]，设置的每月预算为["+ budget +"]");
+        AddProTwoResponse response = new AddProTwoResponse();
+        if (StringUtils.isEmpty(proTwoNameAdd) || StringUtils.isEmpty(type) || StringUtils.isEmpty(proOneId)) {
+            logger.info("新增二级科目失败，因为数据检查失败");
+            response.setOpstatus(Constants.RESPONSE_FAILURE);
         } else {
             //判断此一级科目在当前收入支出项下面是否存在
             List<PfmsUsageLevelOne> pfmsUsageLevelOnes = proSettingService.getProOne(proOneId, type, authentication.getId());
             if (pfmsUsageLevelOnes.size() != 1) {
-                jsonMap.put("opstatus", "fail");
-                jsonMap.put("optype", "");
-                jsonMap.put("opparentid", "");
-                jsonMap.put("opid", "");
-                jsonMap.put("opname", "");
-                jsonMap.put("opparentbudgetamount", "");
-                jsonMap.put("opparentrealamount", "");
-                jsonMap.put("opbudgetamount", "");
-                jsonMap.put("oprealamount", "");
+                logger.info("新增二级科目失败，因为父级科目不存在");
+                response.setOpstatus(Constants.RESPONSE_FAILURE);
             }
             //向数据库中插入此条二级科目
             else {
-                SimpleDateFormat sdf = new SimpleDateFormat("yyyyMM");
-                String today = sdf.format(new Date());
+                String today = PersonalUtil.getDateStr("yyyyMM");
                 //插入二级科目
                 PfmsUsageLevelTwo pfmsUsageLevelTwo = proSettingService.insertProTwoWithPara(proTwoNameAdd, type, authentication.getId(), proOneId, budget);
                 //向预算表中插入当月相关的二级科目
@@ -159,172 +136,133 @@ public class ProSettingController {
                 proSettingService.updateProOne(pfmsUsageLevelOne);
                 //在预算表中更新当月相关的一级科目
                 RealStatistics realStatistics = proSettingService.updateMonthBudget(pfmsUsageLevelOne.getId(),today,newBigDecimal);
-                jsonMap.put("opstatus", "success");
-                jsonMap.put("optype", pfmsUsageLevelTwo.getType());
-                jsonMap.put("opparentid", pfmsUsageLevelTwo.getFatherId());
-                jsonMap.put("opid", pfmsUsageLevelTwo.getId());
-                jsonMap.put("opname", pfmsUsageLevelTwo.getName());
-                jsonMap.put("opparentbudgetamount", personalUtil.bigDecimalToString(newBigDecimal));
-                jsonMap.put("opparentrealamount", personalUtil.bigDecimalToString(realStatistics.getRealamount()));
-                jsonMap.put("opbudgetamount", personalUtil.bigDecimalToString(pfmsUsageLevelTwo.getMonthbudget()));
-                jsonMap.put("oprealamount", "0.00");
+                logger.info("新增二级科目成功");
+                response.setOpstatus(Constants.RESPONSE_SUCCESS);
+                response.setOptype(pfmsUsageLevelTwo.getType());
+                response.setOpparentid(pfmsUsageLevelTwo.getFatherId());
+                response.setOpid(pfmsUsageLevelTwo.getId());
+                response.setOpname(pfmsUsageLevelTwo.getName());
+                response.setOpparentbudgetamount(PersonalUtil.bigDecimalToString(newBigDecimal));
+                response.setOpparentrealamount(PersonalUtil.bigDecimalToString(realStatistics.getRealamount()));
+                response.setOpbudgetamount(PersonalUtil.bigDecimalToString(pfmsUsageLevelTwo.getMonthbudget()));
+                response.setOprealamount("0.00");
             }
         }
-        return jsonMap;
+        return JSON.toJSONString(response);
     }
 
-    //修改一级科目名称
+    //修改一级科目
     @RequestMapping(value = "/proOneModify.json", method = RequestMethod.POST)
     @ResponseBody
-    public Map modifyProOne(@RequestBody Map map) {
-        logger.info("开始修改科目名称！");
-
-        Map jsonMap = new HashMap();
-        String type = "";
-        boolean resultType;
-
+    public String modifyProOne(@RequestBody Map map) {
         //解析并判断JSON
         String proId = (String) map.get("proId");
         String proNameModify = (String) map.get("proNameModify");
-        if (personalUtil.isBlankOrNull(proId) || personalUtil.isBlankOrNull(proNameModify)) {
-            resultType = false;
+        logger.info("开始修改一级科目，修改的科目ID为["+ proId +"]，科目名称为["+ proNameModify +"]");
+        ModifyProOneResponse response = new ModifyProOneResponse();
+        if (StringUtils.isEmpty(proId) || StringUtils.isEmpty(proNameModify)) {
+            response.setOpstatus(Constants.RESPONSE_FAILURE);
+            logger.info("修改一级科目失败，因为数据检查失败");
         } else {
             List<PfmsUsageLevelOne> pfmsUsageLevelOnes = proSettingService.getProOne(proId, null, null);
             if (pfmsUsageLevelOnes.size() == 1) {
                 PfmsUsageLevelOne pfmsUsageLevelOne = pfmsUsageLevelOnes.get(0);
-                type = pfmsUsageLevelOne.getType();
                 pfmsUsageLevelOne.setName(proNameModify);
                 proSettingService.updateProOne(pfmsUsageLevelOne);
-                resultType = true;
+                response.setOpstatus(Constants.RESPONSE_SUCCESS);
+                response.setOptype(pfmsUsageLevelOne.getType());
+                response.setOpid(proId);
+                response.setOpname(proNameModify);
+                logger.info("修改一级科目成功");
             } else {
-                resultType = false;
+                response.setOpstatus(Constants.RESPONSE_FAILURE);
+                logger.info("修改一级科目失败，因为数据库中查找不到指定的科目内容");
             }
-                /*List<PfmsUsageLevelTwo> pfmsUsageLevelTwos = proSettingService.getProTwo(proId, null, null, null);
-                if (pfmsUsageLevelTwos.size() == 1) {
-                    PfmsUsageLevelTwo pfmsUsageLevelTwo = pfmsUsageLevelTwos.get(0);
-                    type = pfmsUsageLevelTwo.getType();
-                    pfmsUsageLevelTwo.setName(proNameModify);
-                    proSettingService.updateProTwo(pfmsUsageLevelTwo);
-                    resultType = true;
-                } else {
-                    resultType = false;
-                }*/
         }
-        if (resultType) {
-            jsonMap.put("opstatus", "success");
-            jsonMap.put("optype", type);
-            jsonMap.put("opid", proId);
-            jsonMap.put("opname", proNameModify);
-        } else {
-            jsonMap.put("opstatus", "fail");
-            jsonMap.put("optype", "");
-            jsonMap.put("opid", "");
-            jsonMap.put("opname", "");
-        }
-        return jsonMap;
+        return JSON.toJSONString(response);
     }
 
     //修改二级科目
     @RequestMapping(value = "/proTwoModify.json", method = RequestMethod.POST)
     @ResponseBody
-    public Map modifyProTwo(@RequestBody Map map) {
-        logger.info("开始修改科目名称！");
-
-        Map jsonMap = new HashMap();
-        String type = "";
-        boolean resultType = true;
-        String parentId = "";
-        BigDecimal parentbudgetamount = null;
-        BigDecimal parentrealamount = null;
-        BigDecimal budgetamount = null;
-        BigDecimal realamount = null;
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMM");
-        String today = sdf.format(new Date());
-
+    public String modifyProTwo(@RequestBody Map map) {
         //解析并判断JSON
         String proId = (String) map.get("proTwoId");
         String proTwoNameModify = (String) map.get("proTwoNameModify");
         String proTwoBudgetModify = (String) map.get("proTwoBudgetModify");
-        if (personalUtil.isBlankOrNull(proId) || personalUtil.isBlankOrNull(proTwoNameModify)|| personalUtil.isBlankOrNull(proTwoBudgetModify)) {
-            resultType = false;
+        logger.info("开始修改二级科目，修改的科目ID为["+ proId +"]，科目名称为["+ proTwoNameModify +"]，修改科目的月预算为["+ proTwoBudgetModify +"]");
+        ModifyProTwoResponse response = new ModifyProTwoResponse();
+        if (StringUtils.isEmpty(proId) || StringUtils.isEmpty(proTwoNameModify)|| StringUtils.isEmpty(proTwoBudgetModify)) {
+            response.setOpstatus(Constants.RESPONSE_FAILURE);
+            logger.info("修改二级科目失败，因为数据检查失败");
         }
-        if(resultType){
+        else{
             List<PfmsUsageLevelTwo> pfmsUsageLevelTwos = proSettingService.getProTwo(proId, null, null, null);
             if (pfmsUsageLevelTwos.size() == 1) {
                 PfmsUsageLevelTwo pfmsUsageLevelTwo = pfmsUsageLevelTwos.get(0);
-                parentId = pfmsUsageLevelTwo.getFatherId();
-                type = pfmsUsageLevelTwo.getType();
+                String parentId = pfmsUsageLevelTwo.getFatherId();
                 pfmsUsageLevelTwo.setName(proTwoNameModify);
                 pfmsUsageLevelTwo.setMonthbudget(new BigDecimal(proTwoBudgetModify));
                 proSettingService.updateProTwo(pfmsUsageLevelTwo);
+
                 BigDecimal sumNum = proSettingService.getParentIdBudget(parentId);
                 List<PfmsUsageLevelOne> pfmsUsageLevelOnes = proSettingService.getProOne(parentId, null, null);
                 PfmsUsageLevelOne pfmsUsageLevelOne = pfmsUsageLevelOnes.get(0);
                 pfmsUsageLevelOne.setMonthbudget(sumNum);
                 proSettingService.updateProOne(pfmsUsageLevelOne);
+
+                String today = PersonalUtil.getDateStr("yyyyMM");
                 RealStatistics realStatisticsForProTwo = proSettingService.updateMonthBudget(proId,today,new BigDecimal(proTwoBudgetModify));
                 RealStatistics realStatisticsForProOne = proSettingService.updateMonthBudget(parentId,today,sumNum);
-                parentbudgetamount = realStatisticsForProOne.getBudget();
-                parentrealamount = realStatisticsForProOne.getRealamount();
-                budgetamount = realStatisticsForProTwo.getBudget();
-                realamount = realStatisticsForProTwo.getRealamount();
-                resultType = true;
+
+                response.setOpstatus(Constants.RESPONSE_SUCCESS);
+                response.setOptype(pfmsUsageLevelTwo.getType());
+                response.setOpparentid(parentId);
+                response.setOpid(proId);
+                response.setOpname(proTwoNameModify);
+                response.setOpparentbudgetamount(PersonalUtil.bigDecimalToString(realStatisticsForProOne.getBudget()));
+                response.setOpparentrealamount(PersonalUtil.bigDecimalToString(realStatisticsForProOne.getRealamount()));
+                response.setOpbudgetamount(PersonalUtil.bigDecimalToString(realStatisticsForProTwo.getBudget()));
+                response.setOprealamount(PersonalUtil.bigDecimalToString(realStatisticsForProTwo.getRealamount()));
+                logger.info("修改二级科目成功");
             } else {
-                resultType = false;
+                response.setOpstatus(Constants.RESPONSE_FAILURE);
+                logger.info("修改二级科目失败，因为数据库中查找不到指定的科目内容");
             }
         }
-        if (resultType) {
-            jsonMap.put("opstatus", "success");
-            jsonMap.put("optype", type);
-            jsonMap.put("opparentid", parentId);
-            jsonMap.put("opid", proId);
-            jsonMap.put("opname", proTwoNameModify);
-            jsonMap.put("opparentbudgetamount", personalUtil.bigDecimalToString(parentbudgetamount));
-            jsonMap.put("opparentrealamount", personalUtil.bigDecimalToString(parentrealamount));
-            jsonMap.put("opbudgetamount", personalUtil.bigDecimalToString(budgetamount));
-            jsonMap.put("oprealamount", personalUtil.bigDecimalToString(realamount));
-
-        } else {
-            jsonMap.put("opstatus", "fail");
-            jsonMap.put("optype", "");
-            jsonMap.put("opparentid", "");
-            jsonMap.put("opid", "");
-            jsonMap.put("opname", "");
-            jsonMap.put("opparentbudgetamount", "");
-            jsonMap.put("opparentrealamount", "");
-            jsonMap.put("opbudgetamount", "");
-            jsonMap.put("oprealamount", "");
-        }
-        return jsonMap;
+        return JSON.toJSONString(response);
     }
 
     //删除科目
     @RequestMapping(value = "/proDelete.json", method = RequestMethod.POST)
     @ResponseBody
-    public Map deletePro(@RequestBody Map map, HttpServletRequest request) {
-        logger.info("开始删除科目操作！");
-
+    public String deletePro(@RequestBody Map map, HttpServletRequest request) {
         //获取用户信息
         Authentication authentication = (Authentication) request.getSession().getAttribute("session_authentication");
         int userId = authentication.getId();
-        Map jsonMap = new HashMap();
-        String type = "";
-        boolean resultType;
 
         //解析并判断JSON
         String proId = (String) map.get("proId");
         String level = (String) map.get("level");
-        if (personalUtil.isBlankOrNull(proId) || personalUtil.isBlankOrNull(level)) {
-            resultType = false;
+        DeleteProResponse response = new DeleteProResponse();
+        logger.info("开始删除科目操作，删除科目ID为["+ proId +"]，级别为["+ level +"]");
+        if (StringUtils.isEmpty(proId) || StringUtils.isEmpty(level)) {
+            response.setOpstatus(Constants.RESPONSE_FAILURE);
+            logger.info("删除科目失败，因为数据检查失败");
         } else {
             if ("1".equals(level)) {
                 List<PfmsUsageLevelOne> pfmsUsageLevelOnes = proSettingService.getProOne(proId, null, userId);
                 if (pfmsUsageLevelOnes.size() == 1) {
-                    type = pfmsUsageLevelOnes.get(0).getType();
                     proSettingService.deleteProOne(pfmsUsageLevelOnes.get(0));
-                    resultType = true;
+
+                    response.setOpstatus(Constants.RESPONSE_SUCCESS);
+                    response.setOptype(pfmsUsageLevelOnes.get(0).getType());
+                    response.setOplvl(level);
+                    response.setOpid(proId);
+                    logger.info("删除一级科目成功");
                 } else {
-                    resultType = false;
+                    response.setOpstatus(Constants.RESPONSE_FAILURE);
+                    logger.info("删除一级科目失败，因为数据库中查找不到指定的科目内容");
                 }
             } else {
                 List<PfmsUsageLevelTwo> pfmsUsageLevelTwos = proSettingService.getProTwo(proId, null, null, userId);
@@ -337,99 +275,107 @@ public class ProSettingController {
                     BigDecimal newBudgetForFather = budgetForFather.subtract(budgetForProTwo);
                     pfmsUsageLevelOne.setMonthbudget(newBudgetForFather);
                     proSettingService.updateProOne(pfmsUsageLevelOne);
-                    type = pfmsUsageLevelTwo.getType();
                     proSettingService.deleteProTwo(pfmsUsageLevelTwos.get(0));
-                    resultType = true;
+
+                    response.setOpstatus(Constants.RESPONSE_SUCCESS);
+                    response.setOptype(pfmsUsageLevelTwo.getType());
+                    response.setOplvl(level);
+                    response.setOpid(proId);
+                    logger.info("删除二级科目成功");
                 } else {
-                    resultType = false;
+                    response.setOpstatus(Constants.RESPONSE_FAILURE);
+                    logger.info("删除二级科目失败，因为数据库中查找不到指定的科目内容");
                 }
             }
         }
-        if (resultType) {
-            jsonMap.put("opstatus", "success");
-            jsonMap.put("optype", type);
-            jsonMap.put("oplvl", level);
-            jsonMap.put("opid", proId);
-
-        } else {
-            jsonMap.put("opstatus", "fail");
-            jsonMap.put("optype", "");
-            jsonMap.put("oplvl", "");
-            jsonMap.put("opid", "");
-        }
-        return jsonMap;
+        return JSON.toJSONString(response);
     }
 
+    //获取一级科目名称
     @RequestMapping(value = "/getProOneName.json",method = RequestMethod.POST)
     @ResponseBody
-    public Map getProOneName(@RequestBody Map map,HttpServletRequest request){
-        Map<String, String> resultMap = new HashMap<String, String>();
+    public String getProOneName(@RequestBody Map map,HttpServletRequest request){
+
+        //解析并判断JSON
         String id = map.get("id").toString();
+        logger.info("开始获取一级科目名称操作，一级科目ID为["+ id +"]");
+        GetProOneNameResponse response = new GetProOneNameResponse();
         Authentication authentication = (Authentication) request.getSession().getAttribute("session_authentication");
         int userId = authentication.getId();
         List<PfmsUsageLevelOne> pfmsUsageLevelOnes = proSettingService.getProOne(id,null,userId);
         if(pfmsUsageLevelOnes.size() != 1){
-            resultMap.put("opstatus","failure");
-            resultMap.put("optname","");
+            response.setOpstatus(Constants.RESPONSE_FAILURE);
+            logger.info("获取一级科目名称操作失败，因为数据库中查找不到指定的科目内容");
         }else{
-            resultMap.put("opstatus","success");
-            resultMap.put("optname",pfmsUsageLevelOnes.get(0).getName());
+            response.setOpstatus(Constants.RESPONSE_SUCCESS);
+            response.setOptname(pfmsUsageLevelOnes.get(0).getName());
+            logger.info("一级科目名称为["+response.getOptname()+"]");
+            logger.info("获取一级科目名称操作成功");
         }
-        return resultMap;
+        return JSON.toJSONString(response);
     }
 
+    //获取二级科目信息
     @RequestMapping(value = "/getProTwoInfo.json",method = RequestMethod.POST)
     @ResponseBody
-    public Map getProTwoInfo(@RequestBody Map map,HttpServletRequest request){
-        Map<String, String> resultMap = new HashMap<String, String>();
+    public String getProTwoInfo(@RequestBody Map map){
+
+        //解析并判断JSON
         String id = map.get("id").toString();
-        Authentication authentication = (Authentication) request.getSession().getAttribute("session_authentication");
-        int userId = authentication.getId();
+        logger.info("开始获取二级科目名称操作，二级科目ID为["+ id +"]");
+        GetProTwoInfoResponse response = new GetProTwoInfoResponse();
         List<PfmsUsageLevelTwo> pfmsUsageLevelTwos = proSettingService.getProTwo(id,null,null,null);
         if(pfmsUsageLevelTwos.size() != 1){
-            resultMap.put("opstatus","failure");
-            resultMap.put("optname","");
-            resultMap.put("opbudget","");
+            response.setOpstatus(Constants.RESPONSE_FAILURE);
+            logger.info("获取二级科目名称操作失败，因为数据库中查找不到指定的科目内容");
         }else{
-            resultMap.put("opstatus","success");
-            resultMap.put("optname",pfmsUsageLevelTwos.get(0).getName());
-            resultMap.put("opbudget",personalUtil.bigDecimalToString(pfmsUsageLevelTwos.get(0).getMonthbudget()));
+            response.setOpstatus(Constants.RESPONSE_SUCCESS);
+            response.setOptname(pfmsUsageLevelTwos.get(0).getName());
+            response.setOpbudget(PersonalUtil.bigDecimalToString(pfmsUsageLevelTwos.get(0).getMonthbudget()));
+            logger.info("二级科目名称为["+ response.getOptname() +"]，其月预算为["+ response.getOpbudget() +"]");
+            logger.info("获取二级科目名称操作成功");
         }
-        return resultMap;
+        return JSON.toJSONString(response);
     }
 
+    //获取将被删除的科目信息
     @RequestMapping(value = "/getProInfoForDelete.json",method = RequestMethod.POST)
     @ResponseBody
-    public Map getProInfoForDelete(@RequestBody Map map,HttpServletRequest request){
-        Map<String, String> resultMap = new HashMap<String, String>();
+    public String getProInfoForDelete(@RequestBody Map map,HttpServletRequest request){
+
+        //解析并判断JSON
         String id = map.get("id").toString();
         String level = map.get("level").toString();
+        logger.info("开始获取将被删除的科目信息，科目ID为["+ id +"]，科目级别为["+ level +"]");
+        GetProInfoForDeleteResponse response = new GetProInfoForDeleteResponse();
         Authentication authentication = (Authentication) request.getSession().getAttribute("session_authentication");
         int userId = authentication.getId();
         if("1".equals(level)){
             List<PfmsUsageLevelOne> pfmsUsageLevelOnes = proSettingService.getProOne(id,null,userId);
             if(pfmsUsageLevelOnes.size() != 1){
-                resultMap.put("opstatus","failure");
-                resultMap.put("optname","");
-                resultMap.put("opbudget","");
+                response.setOpstatus(Constants.RESPONSE_FAILURE);
+                logger.info("获取将被删除的一级科目信息失败，因为数据库中查找不到指定的科目内容");
             }else{
-                resultMap.put("opstatus","success");
-                resultMap.put("optname",pfmsUsageLevelOnes.get(0).getName());
-                resultMap.put("opbudget",personalUtil.bigDecimalToString(pfmsUsageLevelOnes.get(0).getMonthbudget()));
+                response.setOpstatus(Constants.RESPONSE_SUCCESS);
+                response.setOptname(pfmsUsageLevelOnes.get(0).getName());
+                response.setOpbudget(PersonalUtil.bigDecimalToString(pfmsUsageLevelOnes.get(0).getMonthbudget()));
+                logger.info("一级科目名称为["+ response.getOptname() +"]，其月预算为["+ response.getOpbudget() +"]");
+                logger.info("获取将被删除的一级科目信息成功");
             }
         }else{
             List<PfmsUsageLevelTwo> pfmsUsageLevelTwos = proSettingService.getProTwo(id,null,null,userId);
             if(pfmsUsageLevelTwos.size() != 1){
-                resultMap.put("opstatus","failure");
-                resultMap.put("optname","");
-                resultMap.put("opbudget","");
+                response.setOpstatus(Constants.RESPONSE_FAILURE);
+                logger.info("获取将被删除的二级科目信息失败，因为数据库中查找不到指定的科目内容");
             }else{
-                resultMap.put("opstatus","success");
-                resultMap.put("optname",pfmsUsageLevelTwos.get(0).getName());
-                resultMap.put("opbudget",personalUtil.bigDecimalToString(pfmsUsageLevelTwos.get(0).getMonthbudget()));
+                response.setOpstatus(Constants.RESPONSE_SUCCESS);
+                response.setOptname(pfmsUsageLevelTwos.get(0).getName());
+                response.setOpbudget(PersonalUtil.bigDecimalToString(pfmsUsageLevelTwos.get(0).getMonthbudget()));
+                logger.info("二级科目名称为["+ response.getOptname() +"]，其月预算为["+ response.getOpbudget() +"]");
+                logger.info("获取将被删除的二级科目信息成功");
             }
         }
-        return resultMap;
+        return JSON.toJSONString(response);
     }
 
     public HashMap<String, LevelOneProject> getProList(String type, int userId) {
@@ -454,13 +400,13 @@ public class ProSettingController {
                 levelTwoProject.setProjectType(pfmsUsageLevelTwo.getType());
                 levelTwoProject.setProjectName(pfmsUsageLevelTwo.getName());
                 levelTwoProject.setProjectFatherID(pfmsUsageLevelTwo.getFatherId());
-                levelTwoProject.setRealAmountByMonth(personalUtil.bigDecimalToString(realStatistics.getRealamount()));
-                levelTwoProject.setProjectMonthBudget(personalUtil.bigDecimalToString(realStatistics.getBudget()));
+                levelTwoProject.setRealAmountByMonth(PersonalUtil.bigDecimalToString(realStatistics.getRealamount()));
+                levelTwoProject.setProjectMonthBudget(PersonalUtil.bigDecimalToString(realStatistics.getBudget()));
                 levelOneProject.getLevelTwoProjectList().add(levelTwoProject);
             }
             RealStatistics realStatisticsForProOne = proSettingService.getOrInsertMonthBudget(id,today,pfmsUsageLevelOne.getMonthbudget());
-            levelOneProject.setRealAmountByMonth(personalUtil.bigDecimalToString(realStatisticsForProOne.getRealamount()));
-            levelOneProject.setProjectMonthBudget(personalUtil.bigDecimalToString(realStatisticsForProOne.getBudget()));
+            levelOneProject.setRealAmountByMonth(PersonalUtil.bigDecimalToString(realStatisticsForProOne.getRealamount()));
+            levelOneProject.setProjectMonthBudget(PersonalUtil.bigDecimalToString(realStatisticsForProOne.getBudget()));
             map.put(pfmsUsageLevelOne.getId(), levelOneProject);
         }
         return map;

@@ -34,5 +34,8 @@ public class Constants {
     public final static String USER_TYPE_ADMIN = "2";
     public final static String PRO_TYPE_INCOME = "1";
     public final static String PRO_TYPE_EXPEND = "2";
-
+    public final static String RESPONSE_SUCCESS = "success";
+    public final static String RESPONSE_FAILURE = "fail";
+    public final static String DATETIME_FORMAT_MONTH = "yyyyMM";
+    public final static String DATETIME_FORMAT_DATE = "yyyy-MM-dd";
 }

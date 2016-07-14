@@ -5,14 +5,13 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 /**
  * Created by Fred on 2015/12/7.
  */
 public class PersonalUtil {
-
-    //金额数字转换成String类型数据
-    DecimalFormat decimalFormat = new DecimalFormat("0.00");
 
     public String intToString(int number, int index) {
         String tmp = String.valueOf(number);
@@ -26,15 +25,15 @@ public class PersonalUtil {
         }
     }
 
-    public String bigDecimalToString(BigDecimal bigDecimal) {
+    public static String bigDecimalToString(BigDecimal bigDecimal) {
+        //金额数字转换成String类型数据
+        DecimalFormat decimalFormat = new DecimalFormat("0.00");
         return decimalFormat.format(bigDecimal);
     }
 
-    public Boolean isBlankOrNull(String string) {
-        if (string == null || "".equals(string) || string.length() <= 0 || string.isEmpty() == true) {
-            return true;
-        } else {
-            return false;
-        }
+    //根据给定的str范例，获取对应的日期显示
+    public static String getDateStr(String regExp){
+        SimpleDateFormat sdf = new SimpleDateFormat(regExp);
+        return sdf.format(new Date());
     }
 }

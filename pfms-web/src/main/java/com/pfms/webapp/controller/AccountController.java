@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -100,7 +101,7 @@ public class AccountController {
 
         //解析并判断JSON
         String proOneId = (String) map.get("proOneId");
-        if (personalUtil.isBlankOrNull(proOneId)) {
+        if (StringUtils.isEmpty(proOneId)) {
             resultType = false;
         } else {
             logger.info("一级科目分类的ID,proOneId为:" + proOneId);
