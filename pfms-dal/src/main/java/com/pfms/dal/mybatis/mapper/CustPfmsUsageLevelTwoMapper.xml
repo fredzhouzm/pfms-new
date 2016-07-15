@@ -3,7 +3,7 @@
 <mapper namespace="com.pfms.dal.mybatis.dao.CustPfmsUsageLevelTwoMapper">
 
     <select id="getAddResultByFatherId" parameterType="java.lang.String" resultType="java.math.BigDecimal">
-        select sum(MONTHBUDGET) from pfmsdb_usage2 where FATHER_ID = #{fatherId,jdbcType=VARCHAR}
+        select sum(MONTHBUDGET) from pfmsdb_usage_level_two where FATHER_ID = #{fatherId,jdbcType=VARCHAR}
     </select>
 
 </mapper>

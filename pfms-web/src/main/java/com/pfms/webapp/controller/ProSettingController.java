@@ -5,6 +5,7 @@ package com.pfms.webapp.controller;
 
 import com.alibaba.fastjson.JSON;
 import com.pfms.biz.model.ProOneBO;
+import com.pfms.biz.model.ProTwoBO;
 import com.pfms.biz.service.IProSettingService;
 import com.pfms.dal.mybatis.model.PfmsUsageLevelOne;
 import com.pfms.dal.mybatis.model.PfmsUsageLevelTwo;
@@ -27,7 +28,6 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.ModelAndView;
 
 import javax.servlet.http.HttpServletRequest;
-import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -86,13 +86,17 @@ public class ProSettingController {
         } else {
             String today = PersonalUtil.getDateStr(Constants.DATETIME_FORMAT_MONTH);
             ProOneBO proOneBO = proSettingService.insertProOneAndBudget(proOneNameAdd, type, authentication.getId(), today);
-            logger.info("新增一级科目成功");
-            response.setOpstatus(Constants.RESPONSE_SUCCESS);
-            response.setOptype(proOneBO.getType());
-            response.setOpid(proOneBO.getId());
-            response.setOpname(proOneBO.getName());
-            response.setOprealMmount(PersonalUtil.bigDecimalToString(proOneBO.getRealAmount()));
-            response.setOpbudgetMmount(PersonalUtil.bigDecimalToString(proOneBO.getBudget()));
+            if(proOneBO != null){
+                logger.info("新增一级科目成功");
+                response.setOpstatus(Constants.RESPONSE_SUCCESS);
+                response.setOptype(proOneBO.getType());
+                response.setOpid(proOneBO.getId());
+                response.setOpname(proOneBO.getName());
+                response.setOprealMmount(PersonalUtil.bigDecimalToString(proOneBO.getRealAmount()));
+                response.setOpbudgetMmount(PersonalUtil.bigDecimalToString(proOneBO.getBudget()));
+            }else {
+                response.setOpstatus(Constants.RESPONSE_FAILURE);
+            }
         }
         return JSON.toJSONString(response);
     }
@@ -111,7 +115,7 @@ public class ProSettingController {
         String budget = (String) map.get("proTwoBudgetAdd");
         logger.info("开始新增二级科目，科目名称为["+ proTwoNameAdd +"]，新增科目类型为["+ type +"]，新增科目父级科目ID为["+ proOneId +"]，设置的每月预算为["+ budget +"]");
         AddProTwoResponse response = new AddProTwoResponse();
-        if (StringUtils.isEmpty(proTwoNameAdd) || StringUtils.isEmpty(type) || StringUtils.isEmpty(proOneId)) {
+        if (StringUtils.isEmpty(proTwoNameAdd.trim()) || StringUtils.isEmpty(type.trim()) || StringUtils.isEmpty(proOneId.trim())) {
             logger.info("新增二级科目失败，因为数据检查失败");
             response.setOpstatus(Constants.RESPONSE_FAILURE);
         } else {
@@ -124,28 +128,21 @@ public class ProSettingController {
             //向数据库中插入此条二级科目
             else {
                 String today = PersonalUtil.getDateStr("yyyyMM");
-                //插入二级科目
-                PfmsUsageLevelTwo pfmsUsageLevelTwo = proSettingService.insertProTwoWithPara(proTwoNameAdd, type, authentication.getId(), proOneId, budget);
-                //向预算表中插入当月相关的二级科目
-                proSettingService.getOrInsertMonthBudget(pfmsUsageLevelTwo.getId(), today, pfmsUsageLevelTwo.getMonthbudget());
-                //更新一级科目
-                PfmsUsageLevelOne pfmsUsageLevelOne = pfmsUsageLevelOnes.get(0);
-                BigDecimal bigDecimal = pfmsUsageLevelOne.getMonthbudget();
-                BigDecimal newBigDecimal = bigDecimal.add(pfmsUsageLevelTwo.getMonthbudget());
-                pfmsUsageLevelOne.setMonthbudget(newBigDecimal);
-                proSettingService.updateProOne(pfmsUsageLevelOne);
-                //在预算表中更新当月相关的一级科目
-                RealStatistics realStatistics = proSettingService.updateMonthBudget(pfmsUsageLevelOne.getId(),today,newBigDecimal);
-                logger.info("新增二级科目成功");
-                response.setOpstatus(Constants.RESPONSE_SUCCESS);
-                response.setOptype(pfmsUsageLevelTwo.getType());
-                response.setOpparentid(pfmsUsageLevelTwo.getFatherId());
-                response.setOpid(pfmsUsageLevelTwo.getId());
-                response.setOpname(pfmsUsageLevelTwo.getName());
-                response.setOpparentbudgetamount(PersonalUtil.bigDecimalToString(newBigDecimal));
-                response.setOpparentrealamount(PersonalUtil.bigDecimalToString(realStatistics.getRealamount()));
-                response.setOpbudgetamount(PersonalUtil.bigDecimalToString(pfmsUsageLevelTwo.getMonthbudget()));
-                response.setOprealamount("0.00");
+                ProTwoBO proTwoBO = proSettingService.insertProTwoAndBudget(pfmsUsageLevelOnes.get(0),proTwoNameAdd, type, authentication.getId(), today, proOneId, budget);
+                if(proTwoBO != null) {
+                    logger.info("新增二级科目成功");
+                    response.setOpstatus(Constants.RESPONSE_SUCCESS);
+                    response.setOptype(proTwoBO.getType());
+                    response.setOpparentid(proTwoBO.getFatherId());
+                    response.setOpid(proTwoBO.getId());
+                    response.setOpname(proTwoBO.getName());
+                    response.setOpparentbudgetamount(PersonalUtil.bigDecimalToString(proTwoBO.getParentBudgetAmount()));
+                    response.setOpparentrealamount(PersonalUtil.bigDecimalToString(proTwoBO.getParentRealAmount()));
+                    response.setOpbudgetamount(PersonalUtil.bigDecimalToString(proTwoBO.getMonthbudget()));
+                    response.setOprealamount(PersonalUtil.bigDecimalToString(proTwoBO.getRealAmount()));
+                }else{
+                    response.setOpstatus(Constants.RESPONSE_FAILURE);
+                }
             }
         }
         return JSON.toJSONString(response);
@@ -199,31 +196,18 @@ public class ProSettingController {
         else{
             List<PfmsUsageLevelTwo> pfmsUsageLevelTwos = proSettingService.getProTwo(proId, null, null, null);
             if (pfmsUsageLevelTwos.size() == 1) {
-                PfmsUsageLevelTwo pfmsUsageLevelTwo = pfmsUsageLevelTwos.get(0);
-                String parentId = pfmsUsageLevelTwo.getFatherId();
-                pfmsUsageLevelTwo.setName(proTwoNameModify);
-                pfmsUsageLevelTwo.setMonthbudget(new BigDecimal(proTwoBudgetModify));
-                proSettingService.updateProTwo(pfmsUsageLevelTwo);
-
-                BigDecimal sumNum = proSettingService.getParentIdBudget(parentId);
-                List<PfmsUsageLevelOne> pfmsUsageLevelOnes = proSettingService.getProOne(parentId, null, null);
-                PfmsUsageLevelOne pfmsUsageLevelOne = pfmsUsageLevelOnes.get(0);
-                pfmsUsageLevelOne.setMonthbudget(sumNum);
-                proSettingService.updateProOne(pfmsUsageLevelOne);
-
                 String today = PersonalUtil.getDateStr("yyyyMM");
-                RealStatistics realStatisticsForProTwo = proSettingService.updateMonthBudget(proId,today,new BigDecimal(proTwoBudgetModify));
-                RealStatistics realStatisticsForProOne = proSettingService.updateMonthBudget(parentId,today,sumNum);
+                ProTwoBO proTwoBO = proSettingService.modifyProTwoAndBudget(pfmsUsageLevelTwos.get(0),proId, proTwoNameModify, proTwoBudgetModify, today);
 
                 response.setOpstatus(Constants.RESPONSE_SUCCESS);
-                response.setOptype(pfmsUsageLevelTwo.getType());
-                response.setOpparentid(parentId);
-                response.setOpid(proId);
-                response.setOpname(proTwoNameModify);
-                response.setOpparentbudgetamount(PersonalUtil.bigDecimalToString(realStatisticsForProOne.getBudget()));
-                response.setOpparentrealamount(PersonalUtil.bigDecimalToString(realStatisticsForProOne.getRealamount()));
-                response.setOpbudgetamount(PersonalUtil.bigDecimalToString(realStatisticsForProTwo.getBudget()));
-                response.setOprealamount(PersonalUtil.bigDecimalToString(realStatisticsForProTwo.getRealamount()));
+                response.setOptype(proTwoBO.getType());
+                response.setOpparentid(proTwoBO.getFatherId());
+                response.setOpid(proTwoBO.getId());
+                response.setOpname(proTwoBO.getName());
+                response.setOpparentbudgetamount(PersonalUtil.bigDecimalToString(proTwoBO.getParentBudgetAmount()));
+                response.setOpparentrealamount(PersonalUtil.bigDecimalToString(proTwoBO.getParentRealAmount()));
+                response.setOpbudgetamount(PersonalUtil.bigDecimalToString(proTwoBO.getMonthbudget()));
+                response.setOprealamount(PersonalUtil.bigDecimalToString(proTwoBO.getRealAmount()));
                 logger.info("修改二级科目成功");
             } else {
                 response.setOpstatus(Constants.RESPONSE_FAILURE);
@@ -267,21 +251,17 @@ public class ProSettingController {
             } else {
                 List<PfmsUsageLevelTwo> pfmsUsageLevelTwos = proSettingService.getProTwo(proId, null, null, userId);
                 if (pfmsUsageLevelTwos.size() == 1) {
-                    PfmsUsageLevelTwo pfmsUsageLevelTwo = pfmsUsageLevelTwos.get(0);
-                    String parentId = pfmsUsageLevelTwo.getFatherId();
-                    BigDecimal budgetForProTwo = pfmsUsageLevelTwo.getMonthbudget();
-                    PfmsUsageLevelOne pfmsUsageLevelOne = proSettingService.getProOne(parentId,null,userId).get(0);
-                    BigDecimal budgetForFather = pfmsUsageLevelOne.getMonthbudget();
-                    BigDecimal newBudgetForFather = budgetForFather.subtract(budgetForProTwo);
-                    pfmsUsageLevelOne.setMonthbudget(newBudgetForFather);
-                    proSettingService.updateProOne(pfmsUsageLevelOne);
-                    proSettingService.deleteProTwo(pfmsUsageLevelTwos.get(0));
-
-                    response.setOpstatus(Constants.RESPONSE_SUCCESS);
-                    response.setOptype(pfmsUsageLevelTwo.getType());
-                    response.setOplvl(level);
-                    response.setOpid(proId);
-                    logger.info("删除二级科目成功");
+                    PfmsUsageLevelTwo pfmsUsageLevelTwo  = pfmsUsageLevelTwos.get(0);
+                    boolean result = proSettingService.deleteProTwoAndUptProOne(pfmsUsageLevelTwo);
+                    if(result) {
+                        response.setOpstatus(Constants.RESPONSE_SUCCESS);
+                        response.setOptype(pfmsUsageLevelTwo.getType());
+                        response.setOplvl(level);
+                        response.setOpid(proId);
+                        logger.info("删除二级科目成功");
+                    }else{
+                        response.setOpstatus(Constants.RESPONSE_FAILURE);
+                    }
                 } else {
                     response.setOpstatus(Constants.RESPONSE_FAILURE);
                     logger.info("删除二级科目失败，因为数据库中查找不到指定的科目内容");

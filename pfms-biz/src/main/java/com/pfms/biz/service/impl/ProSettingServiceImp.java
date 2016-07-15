@@ -1,6 +1,7 @@
 package com.pfms.biz.service.impl;
 
 import com.pfms.biz.model.ProOneBO;
+import com.pfms.biz.model.ProTwoBO;
 import com.pfms.biz.service.IProSettingService;
 import com.pfms.biz.service.ISequenceService;
 import com.pfms.dal.mybatis.dao.CustPfmsUsageLevelTwoMapper;
@@ -13,7 +14,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,11 +50,13 @@ public class ProSettingServiceImp implements IProSettingService {
     }
 
     @Override
-        public void updateProOne(PfmsUsageLevelOne pfmsUsageLevelOne) {
+    @Transactional
+    public void updateProOne(PfmsUsageLevelOne pfmsUsageLevelOne) {
         pfmsUsageLevelOneMapper.updateByPrimaryKeySelective(pfmsUsageLevelOne);
     }
 
     @Override
+    @Transactional
     public void deleteProOne(PfmsUsageLevelOne pfmsUsageLevelOne) {
         pfmsUsageLevelOneMapper.deleteByPrimaryKey(pfmsUsageLevelOne.getId());
     }
@@ -65,11 +67,13 @@ public class ProSettingServiceImp implements IProSettingService {
     }
 
     @Override
+    @Transactional
     public void updateProTwo(PfmsUsageLevelTwo pfmsUsageLevelTwo) {
         pfmsUsageLevelTwoMapper.updateByPrimaryKeySelective(pfmsUsageLevelTwo);
     }
 
     @Override
+    @Transactional
     public void deleteProTwo(PfmsUsageLevelTwo pfmsUsageLevelTwo) {
         pfmsUsageLevelTwoMapper.deleteByPrimaryKey(pfmsUsageLevelTwo.getId());
     }
@@ -166,6 +170,7 @@ public class ProSettingServiceImp implements IProSettingService {
     }
 
     @Override
+    @Transactional
     public RealStatistics updateMonthBudget(String id, String month, BigDecimal money) {
         RealStatisticsExample realStatisticsExample = new RealStatisticsExample();
         realStatisticsExample.createCriteria().andIdEqualTo(id).andMonthEqualTo(month);
@@ -197,12 +202,101 @@ public class ProSettingServiceImp implements IProSettingService {
     @Override
     @Transactional
     public ProOneBO insertProOneAndBudget(String name, String type, int userId, String month) {
+
         ProOneBO proOneBO = new ProOneBO();
-        PfmsUsageLevelOne pfmsUsageLevelOne = insertProOneWithPara(name, type, userId);
-        RealStatistics realStatisticses = getOrInsertMonthBudget(pfmsUsageLevelOne.getId(),month,pfmsUsageLevelOne.getMonthbudget());
-        BeanUtils.copyProperties(pfmsUsageLevelOne,proOneBO);
-        proOneBO.setBudget(realStatisticses.getBudget());
-        proOneBO.setRealAmount(realStatisticses.getRealamount());
-        return proOneBO;
+
+        try {
+            PfmsUsageLevelOne pfmsUsageLevelOne = insertProOneWithPara(name, type, userId);
+            RealStatistics realStatisticses = getOrInsertMonthBudget(pfmsUsageLevelOne.getId(), month, pfmsUsageLevelOne.getMonthbudget());
+            BeanUtils.copyProperties(pfmsUsageLevelOne, proOneBO);
+            proOneBO.setBudget(realStatisticses.getBudget());
+            proOneBO.setRealAmount(realStatisticses.getRealamount());
+            return proOneBO;
+        }catch (Exception e){
+            logger.info("ERROR:[新增一级科目失败，原因是数据库插入失败]");
+            return  null;
+        }
+    }
+
+    @Override
+    @Transactional
+    public ProTwoBO insertProTwoAndBudget(PfmsUsageLevelOne pfmsUsageLevelOne, String name, String type, int userId, String month, String proOneId, String budget) {
+
+        ProTwoBO proTwoBO = new ProTwoBO();
+
+        try {
+            PfmsUsageLevelTwo pfmsUsageLevelTwo = insertProTwoWithPara(name, type, userId, proOneId, budget);
+            //向预算表中插入当月相关的二级科目
+            getOrInsertMonthBudget(pfmsUsageLevelTwo.getId(), month, pfmsUsageLevelTwo.getMonthbudget());
+            //更新一级科目
+            BigDecimal bigDecimal = pfmsUsageLevelOne.getMonthbudget();
+            BigDecimal newBigDecimal = bigDecimal.add(pfmsUsageLevelTwo.getMonthbudget());
+            pfmsUsageLevelOne.setMonthbudget(newBigDecimal);
+            updateProOne(pfmsUsageLevelOne);
+            //在预算表中更新当月相关的一级科目
+            RealStatistics realStatistics = updateMonthBudget(pfmsUsageLevelOne.getId(), month, newBigDecimal);
+
+            BeanUtils.copyProperties(pfmsUsageLevelTwo, proTwoBO);
+            proTwoBO.setParentBudgetAmount(realStatistics.getBudget());
+            proTwoBO.setParentRealAmount(realStatistics.getRealamount());
+            proTwoBO.setRealAmount(new BigDecimal(0.00));
+
+            return proTwoBO;
+        }catch (Exception e){
+            logger.info("ERROR:[新增二级科目失败，原因是数据库插入失败]");
+            return null;
+        }
+    }
+
+    @Override
+    @Transactional
+    public ProTwoBO modifyProTwoAndBudget(PfmsUsageLevelTwo pfmsUsageLevelTwo, String proId, String proTwoNameModify, String proTwoBudgetModify, String today) {
+
+        ProTwoBO proTwoBO = new ProTwoBO();
+
+        try{
+            String parentId = pfmsUsageLevelTwo.getFatherId();
+            pfmsUsageLevelTwo.setName(proTwoNameModify);
+            pfmsUsageLevelTwo.setMonthbudget(new BigDecimal(proTwoBudgetModify));
+            updateProTwo(pfmsUsageLevelTwo);
+
+            BigDecimal sumNum = getParentIdBudget(parentId);
+            List<PfmsUsageLevelOne> pfmsUsageLevelOnes = getProOne(parentId, null, null);
+            PfmsUsageLevelOne pfmsUsageLevelOne = pfmsUsageLevelOnes.get(0);
+            pfmsUsageLevelOne.setMonthbudget(sumNum);
+            updateProOne(pfmsUsageLevelOne);
+
+            RealStatistics realStatisticsForProTwo = updateMonthBudget(proId,today,new BigDecimal(proTwoBudgetModify));
+            RealStatistics realStatisticsForProOne = updateMonthBudget(parentId,today,sumNum);
+
+            BeanUtils.copyProperties(pfmsUsageLevelTwo, proTwoBO);
+            proTwoBO.setParentBudgetAmount(sumNum);
+            proTwoBO.setParentRealAmount(realStatisticsForProOne.getRealamount());
+            proTwoBO.setRealAmount(realStatisticsForProTwo.getRealamount());
+
+            return proTwoBO;
+        }catch (Exception e){
+            logger.info("ERROR:[修改二级科目失败，原因是数据库操作失败]");
+            return null;
+        }
+    }
+
+    @Override
+    @Transactional
+    public boolean deleteProTwoAndUptProOne(PfmsUsageLevelTwo pfmsUsageLevelTwo) {
+        try {
+            String parentId = pfmsUsageLevelTwo.getFatherId();
+            BigDecimal budgetForProTwo = pfmsUsageLevelTwo.getMonthbudget();
+            PfmsUsageLevelOne pfmsUsageLevelOne = getProOne(parentId, null, null).get(0);
+            BigDecimal budgetForFather = pfmsUsageLevelOne.getMonthbudget();
+            BigDecimal newBudgetForFather = budgetForFather.subtract(budgetForProTwo);
+            pfmsUsageLevelOne.setMonthbudget(newBudgetForFather);
+            updateProOne(pfmsUsageLevelOne);
+            deleteProTwo(pfmsUsageLevelTwo);
+            return true;
+        }catch (Exception e){
+            logger.info("ERROR:[删除二级科目失败，原因是数据库操作失败]");
+            return false;
+        }
     }
 }
