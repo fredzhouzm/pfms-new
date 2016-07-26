@@ -124,23 +124,27 @@
                 <th>备注</th>
                 <th>操作</th>
             </tr>
-            <#list formList as form>
-            <tr id="${form.id}">
-                <td>
-                    <#if form.type=="1"><span class="label label-success">收入</span>
-                    <#else><span class="label label-danger">支出</span>
-                    </#if>
-                </td>
-                <td>${form.amount}</td>
-                <td>${form.valueDateStr}&nbsp;${form.peroidStr}</td>
-                <td>${form.proOneStr}&nbsp;-&nbsp;${form.proTwoStr}</td>
-                <td>${form.remark}</td>
-                <td>
-                    <a class="btn btn-default btn-xs" data-toggle="modal" data-target="#modifyPanel" data-id="${form.id}" data-type="${form.type}"><span class="glyphicon glyphicon-pencil" aria-hidden="true"></span>修改</a>&nbsp;&nbsp;&nbsp;&nbsp;
-                    <a class="btn btn-danger btn-xs" data-toggle="modal" data-target="#deletePanel" data-id="${form.id}" data-type="${form.type}"><span class="glyphicon glyphicon-remove" aria-hidden="true"></span>删除</a>
-                </td>
-            </tr>
-            </#list>
+            <#if (formList?size=0)>
+                <tr><td colspan="6" class="noDataInfo">当月没有任何数据!</td></tr>
+            <#else>
+                <#list formList as form>
+                <tr id="${form.id}">
+                    <td>
+                        <#if form.type=="1"><span class="label label-success">收入</span>
+                        <#else><span class="label label-danger">支出</span>
+                        </#if>
+                    </td>
+                    <td>${form.amount}</td>
+                    <td>${form.valueDateStr}&nbsp;${form.peroidStr}</td>
+                    <td>${form.proOneStr}&nbsp;-&nbsp;${form.proTwoStr}</td>
+                    <td>${form.remark}</td>
+                    <td>
+                        <a class="btn btn-default btn-xs" data-toggle="modal" data-target="#modifyPanel" data-id="${form.id}" data-type="${form.type}"><span class="glyphicon glyphicon-pencil" aria-hidden="true"></span>修改</a>&nbsp;&nbsp;&nbsp;&nbsp;
+                        <a class="btn btn-danger btn-xs" data-toggle="modal" data-target="#deletePanel" data-id="${form.id}" data-type="${form.type}"><span class="glyphicon glyphicon-remove" aria-hidden="true"></span>删除</a>
+                    </td>
+                </tr>
+                </#list>
+            </#if>
         </table>
     </div>
 </div>
@@ -230,7 +234,7 @@
             <div class="modal-header">
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span
                         aria-hidden="true">&times;</span></button>
-                <h4 class="modal-title" id="deletePanelHead"><@spring.message 'text.modifyProName'/></h4>
+                <h4 class="modal-title" id="deletePanelHead"><@spring.message 'text.deletePro'/></h4>
             </div>
             <div class="modal-body">
                 <form id="deleteOrder" name="deleteOrder">

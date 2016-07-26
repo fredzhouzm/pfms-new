@@ -181,6 +181,7 @@ $(document).ready(function () {
                         totalHtml += '<td><a class="btn btn-default btn-xs" data-toggle="modal" data-target="#modifyPanel" data-id="' + id + '" data-type="' + type + '"><span class="glyphicon glyphicon-pencil" aria-hidden="true"></span>修改</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;';
                         totalHtml += '<a class="btn btn-danger btn-xs" data-toggle="modal" data-target="#deletePanel" data-id="' + id + '" data-type="' + type + '"><span class="glyphicon glyphicon-remove" aria-hidden="true"></span>删除</a>';
 
+                        $('.noDataInfo').remove();
                         $('#titleTr').after(totalHtml);
                         $('#totalamountin').html(totalAmountIn);
                         $('#totalamountout').html(totalAmountOut);
@@ -419,12 +420,17 @@ $(document).ready(function () {
                 var status = data.opstatus;
                 var id = data.opid;
                 var amount = data.optype;
+                var count = data.count;
                 var totalAmountIn = data.optotalAmountIn;
                 var totalAmountOut = data.optotalAmountOut;
                 if(status == 'success'){
                     $('#'+id).remove();
                     $('#totalamountin').html(totalAmountIn);
                     $('#totalamountout').html(totalAmountOut);
+                    if(count == 0) {
+                        var totalHtml = '<tr><td colspan="6" class="noDataInfo">当月没有任何数据!</td></tr>';
+                        $('table tr:eq(0)').after(totalHtml);
+                    }
                 };
                 $('#deletePanel').modal('hide');
             }

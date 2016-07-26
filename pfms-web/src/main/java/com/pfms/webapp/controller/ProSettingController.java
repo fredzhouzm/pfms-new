@@ -3,7 +3,6 @@
  */
 package com.pfms.webapp.controller;
 
-import com.alibaba.fastjson.JSON;
 import com.pfms.biz.model.ProOneBO;
 import com.pfms.biz.model.ProTwoBO;
 import com.pfms.biz.service.IProSettingService;
@@ -72,7 +71,7 @@ public class ProSettingController {
     //新增一级科目
     @RequestMapping(value = "/addProOne.json", method = RequestMethod.POST)
     @ResponseBody
-    public String addProOne(@RequestBody Map map, HttpServletRequest request) {
+    public AddProOneResponse addProOne(@RequestBody Map map, HttpServletRequest request) {
         //获取用户信息
         Authentication authentication = (Authentication) request.getSession().getAttribute("session_authentication");
         //解析并判断JSON
@@ -98,13 +97,13 @@ public class ProSettingController {
                 response.setOpstatus(Constants.RESPONSE_FAILURE);
             }
         }
-        return JSON.toJSONString(response);
+        return response;
     }
 
     //新增二级科目
     @RequestMapping(value = "/addProTwo.json", method = RequestMethod.POST)
     @ResponseBody
-    public String addProTwo(@RequestBody Map map, HttpServletRequest request) {
+    public AddProTwoResponse addProTwo(@RequestBody Map map, HttpServletRequest request) {
         //获取用户信息
         Authentication authentication = (Authentication) request.getSession().getAttribute("session_authentication");
 
@@ -145,13 +144,13 @@ public class ProSettingController {
                 }
             }
         }
-        return JSON.toJSONString(response);
+        return response;
     }
 
     //修改一级科目
     @RequestMapping(value = "/proOneModify.json", method = RequestMethod.POST)
     @ResponseBody
-    public String modifyProOne(@RequestBody Map map) {
+    public ModifyProOneResponse modifyProOne(@RequestBody Map map) {
         //解析并判断JSON
         String proId = (String) map.get("proId");
         String proNameModify = (String) map.get("proNameModify");
@@ -176,13 +175,13 @@ public class ProSettingController {
                 logger.info("修改一级科目失败，因为数据库中查找不到指定的科目内容");
             }
         }
-        return JSON.toJSONString(response);
+        return response;
     }
 
     //修改二级科目
     @RequestMapping(value = "/proTwoModify.json", method = RequestMethod.POST)
     @ResponseBody
-    public String modifyProTwo(@RequestBody Map map) {
+    public ModifyProTwoResponse modifyProTwo(@RequestBody Map map) {
         //解析并判断JSON
         String proId = (String) map.get("proTwoId");
         String proTwoNameModify = (String) map.get("proTwoNameModify");
@@ -214,13 +213,13 @@ public class ProSettingController {
                 logger.info("修改二级科目失败，因为数据库中查找不到指定的科目内容");
             }
         }
-        return JSON.toJSONString(response);
+        return response;
     }
 
     //删除科目
     @RequestMapping(value = "/proDelete.json", method = RequestMethod.POST)
     @ResponseBody
-    public String deletePro(@RequestBody Map map, HttpServletRequest request) {
+    public DeleteProResponse deletePro(@RequestBody Map map, HttpServletRequest request) {
         //获取用户信息
         Authentication authentication = (Authentication) request.getSession().getAttribute("session_authentication");
         int userId = authentication.getId();
@@ -268,13 +267,13 @@ public class ProSettingController {
                 }
             }
         }
-        return JSON.toJSONString(response);
+        return response;
     }
 
     //获取一级科目名称
     @RequestMapping(value = "/getProOneName.json",method = RequestMethod.POST)
     @ResponseBody
-    public String getProOneName(@RequestBody Map map,HttpServletRequest request){
+    public GetProOneNameResponse getProOneName(@RequestBody Map map,HttpServletRequest request){
 
         //解析并判断JSON
         String id = map.get("id").toString();
@@ -292,13 +291,13 @@ public class ProSettingController {
             logger.info("一级科目名称为["+response.getOptname()+"]");
             logger.info("获取一级科目名称操作成功");
         }
-        return JSON.toJSONString(response);
+        return response;
     }
 
     //获取二级科目信息
     @RequestMapping(value = "/getProTwoInfo.json",method = RequestMethod.POST)
     @ResponseBody
-    public String getProTwoInfo(@RequestBody Map map){
+    public GetProTwoInfoResponse getProTwoInfo(@RequestBody Map map){
 
         //解析并判断JSON
         String id = map.get("id").toString();
@@ -315,13 +314,13 @@ public class ProSettingController {
             logger.info("二级科目名称为["+ response.getOptname() +"]，其月预算为["+ response.getOpbudget() +"]");
             logger.info("获取二级科目名称操作成功");
         }
-        return JSON.toJSONString(response);
+        return response;
     }
 
     //获取将被删除的科目信息
     @RequestMapping(value = "/getProInfoForDelete.json",method = RequestMethod.POST)
     @ResponseBody
-    public String getProInfoForDelete(@RequestBody Map map,HttpServletRequest request){
+    public GetProInfoForDeleteResponse getProInfoForDelete(@RequestBody Map map,HttpServletRequest request){
 
         //解析并判断JSON
         String id = map.get("id").toString();
@@ -355,7 +354,7 @@ public class ProSettingController {
                 logger.info("获取将被删除的二级科目信息成功");
             }
         }
-        return JSON.toJSONString(response);
+        return response;
     }
 
     public HashMap<String, LevelOneProject> getProList(String type, int userId) {

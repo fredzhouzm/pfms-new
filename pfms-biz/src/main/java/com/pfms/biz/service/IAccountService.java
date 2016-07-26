@@ -42,4 +42,6 @@ public interface IAccountService {
 
     public List<FormVm> getFormVmListByCondition(String type, Date beginDate, Date endDate, String proOneId, String proTwoId, String id);
 
+    public int getMonthOrderCount(int selectedYear, int seletedMonth, int userId);
+
 }

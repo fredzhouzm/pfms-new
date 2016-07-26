@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
@@ -13,7 +14,7 @@ import java.util.Date;
  */
 public class PersonalUtil {
 
-    public String intToString(int number, int index) {
+    public static String intToString(int number, int index) {
         String tmp = String.valueOf(number);
         if (tmp.getBytes().length >= index) {
             return tmp;
@@ -35,5 +36,16 @@ public class PersonalUtil {
     public static String getDateStr(String regExp){
         SimpleDateFormat sdf = new SimpleDateFormat(regExp);
         return sdf.format(new Date());
+    }
+
+    public static Date getStrToDate(String date, String regExp) throws ParseException {
+        SimpleDateFormat sdf = new SimpleDateFormat(regExp);
+        return sdf.parse(date);
+    }
+
+    //根据给定的str范例，获取对应的日期显示
+    public static String getDateStr(String regExp, Date date){
+        SimpleDateFormat sdf = new SimpleDateFormat(regExp);
+        return sdf.format(date);
     }
 }

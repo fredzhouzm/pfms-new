@@ -40,8 +40,6 @@ public class AccountServiceImp implements IAccountService {
     @Autowired
     ISequenceService sequenceService;
 
-    SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd");
-
     public HashMap getProOne(String type, int userId) {
         logger.info("开始获取用户ID为[" + userId + "],TYPE为[" + type + "]的一级科目分类!");
 
@@ -88,9 +86,9 @@ public class AccountServiceImp implements IAccountService {
         PfmsFormExample pfmsFormExample = new PfmsFormExample();
         pfmsFormExample.createCriteria().andIdEqualTo(formId);
         List<PfmsForm> pfmsForms = pfmsFormMapper.selectByExample(pfmsFormExample);
-        if(pfmsForms.size() != 1){
+        if (pfmsForms.size() != 1) {
             return null;
-        }else{
+        } else {
             return pfmsForms.get(0);
         }
     }
@@ -111,7 +109,7 @@ public class AccountServiceImp implements IAccountService {
         queryParam.put("type", type);
         queryParam.put("firstDate", firstDate);
         queryParam.put("lastDate", lastDate);
-        BigDecimal sumAmount = customMapper.selTotAmtByMon(type,firstDate,lastDate,creatorId);
+        BigDecimal sumAmount = customMapper.selTotAmtByMon(type, firstDate, lastDate, creatorId);
         return sumAmount;
     }
 
@@ -133,18 +131,18 @@ public class AccountServiceImp implements IAccountService {
         calendar.set(Calendar.MONTH, month - 1);
         if ("B".equals(type)) {
             calendar.set(Calendar.DAY_OF_MONTH, 1);
-            calendar.set(Calendar.HOUR_OF_DAY,0);
-            calendar.set(Calendar.MINUTE,0);
-            calendar.set(Calendar.SECOND,0);
-            calendar.set(Calendar.MILLISECOND,0);
+            calendar.set(Calendar.HOUR_OF_DAY, 0);
+            calendar.set(Calendar.MINUTE, 0);
+            calendar.set(Calendar.SECOND, 0);
+            calendar.set(Calendar.MILLISECOND, 0);
             date = calendar.getTime();
         } else {
             int lastDay = calendar.getActualMaximum(Calendar.DAY_OF_MONTH);
             calendar.set(Calendar.DAY_OF_MONTH, lastDay);
-            calendar.set(Calendar.HOUR_OF_DAY,23);
-            calendar.set(Calendar.MINUTE,59);
-            calendar.set(Calendar.SECOND,59);
-            calendar.set(Calendar.MILLISECOND,999);
+            calendar.set(Calendar.HOUR_OF_DAY, 23);
+            calendar.set(Calendar.MINUTE, 59);
+            calendar.set(Calendar.SECOND, 59);
+            calendar.set(Calendar.MILLISECOND, 999);
             date = calendar.getTime();
         }
         return date;
@@ -153,22 +151,35 @@ public class AccountServiceImp implements IAccountService {
     public List<FormVm> getFormVmListByCondition(String type, Date beginDate, Date endDate, String proOneId, String proTwoId, String id) {
         FormVmExample formVmExample = new FormVmExample();
         FormVmExample.Criteria criteria = formVmExample.createCriteria();
-        if(type != null && ("1".equals(type) || "2".equals(type))){
+        if (type != null && ("1".equals(type) || "2".equals(type))) {
             criteria.andTypeEqualTo(type);
         }
-        if(beginDate !=null && endDate != null && beginDate.before(endDate) && endDate.before(new Date())) {
+        if (beginDate != null && endDate != null && beginDate.before(endDate) && endDate.before(new Date())) {
             criteria.andValueDateBetween(beginDate, endDate);
         }
-        if(proOneId != null && !"".equals(proOneId)){
+        if (proOneId != null && !"".equals(proOneId)) {
             criteria.andUsageLevelOneEqualTo(proOneId);
         }
-        if(proTwoId !=null && !"".equals(proTwoId)){
+        if (proTwoId != null && !"".equals(proTwoId)) {
             criteria.andUsageLevelTwoEqualTo(proTwoId);
         }
-        if(id != null && !"".equals(id)){
+        if (id != null && !"".equals(id)) {
             criteria.andIdEqualTo(id);
         }
         List<FormVm> formVmList = formVmMapper.selectByExample(formVmExample);
-        return  formVmList;
+        return formVmList;
+    }
+
+    public int getMonthOrderCount(int selectedYear, int seletedMonth, int userId) {
+        Calendar beginTime = Calendar.getInstance();
+        Calendar endTime = Calendar.getInstance();
+        beginTime.set(selectedYear, seletedMonth - 1, 1, 0, 0, 0);
+        beginTime.set(Calendar.MILLISECOND, 0);
+        endTime.set(selectedYear, seletedMonth, 1, 0, 0, 0);
+        endTime.set(Calendar.MILLISECOND, 0);
+        PfmsFormExample pfmsFormExample = new PfmsFormExample();
+        pfmsFormExample.createCriteria().andValueDateBetween(beginTime.getTime(), endTime.getTime()).andCreatorIdEqualTo(userId);
+        int count = pfmsFormMapper.countByExample(pfmsFormExample);
+        return count;
     }
 }

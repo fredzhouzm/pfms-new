@@ -13,7 +13,25 @@
     <mvc:resources mapping="/JavaScript/**/" location="/WEB-INF/JavaScript/"/>
     <mvc:resources mapping="/fonts/**/" location="/WEB-INF/fonts/"/>
     <!--默认注解映射支持-->
-    <mvc:annotation-driven validator="validator"/>
+    <mvc:annotation-driven validator="validator">
+            <mvc:message-converters register-defaults="true">
+                <bean class="com.alibaba.fastjson.support.spring.FastJsonHttpMessageConverter">
+                    <property name="supportedMediaTypes">
+                        <list>
+                            <value>application/json</value>
+                        </list>
+                    </property>
+                    <property name="features">
+                        <list>
+                            <value>WriteMapNullValue</value>
+                            <value>QuoteFieldNames</value>
+                            <value>WriteNullListAsEmpty</value>
+                            <value>WriteNullStringAsEmpty</value>
+                        </list>
+                    </property>
+                </bean>
+            </mvc:message-converters>
+    </mvc:annotation-driven>
 
     <bean id="validator" class="org.springframework.validation.beanvalidation.LocalValidatorFactoryBean">
         <property name="providerClass" value="org.hibernate.validator.HibernateValidator"/>
@@ -51,7 +69,7 @@
         <!-- 默认视图 放在解析链最后 -->
         <property name="defaultViews">
             <list>
-                <bean class="org.springframework.web.servlet.view.json.MappingJackson2JsonView"/>
+                <bean class="com.alibaba.fastjson.support.spring.FastJsonJsonView"/>
             </list>
         </property>
     </bean>

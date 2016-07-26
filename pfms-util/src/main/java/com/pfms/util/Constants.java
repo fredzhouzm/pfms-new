@@ -38,4 +38,5 @@ public class Constants {
     public final static String RESPONSE_FAILURE = "fail";
     public final static String DATETIME_FORMAT_MONTH = "yyyyMM";
     public final static String DATETIME_FORMAT_DATE = "yyyy-MM-dd";
+    public final static String SESSION = "session_authentication";
 }
