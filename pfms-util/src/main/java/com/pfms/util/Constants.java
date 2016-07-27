@@ -39,4 +39,6 @@ public class Constants {
     public final static String DATETIME_FORMAT_MONTH = "yyyyMM";
     public final static String DATETIME_FORMAT_DATE = "yyyy-MM-dd";
     public final static String SESSION = "session_authentication";
+    public final static String DAY_OF_MONTH_BEGIN = "B";
+    public final static String DAY_OF_MONTH_END = "E";
 }

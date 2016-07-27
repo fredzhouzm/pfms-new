@@ -12,6 +12,7 @@ import com.pfms.util.PersonalUtil;
 import com.pfms.webapp.jsonResponse.*;
 import com.pfms.webapp.model.Authentication;
 import com.pfms.webapp.model.FormToShow;
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,20 +52,19 @@ public class AccountController {
 
     @RequestMapping(value = "/show")
     public ModelAndView accountInit(HttpServletRequest request) {
-        logger.info("记账页面初始化");
+        logger.info("记账页面初始化,获取相应的页面参数");
         ModelAndView modelAndView = new ModelAndView();
-        HashMap<String, String> incomeProOneList;
-        HashMap<String, String> expendProOneList;
         Authentication authentication = (Authentication) request.getSession().getAttribute(Constants.SESSION);
+        int userId = authentication.getId();
 
-        String now = getDateStr(Constants.DATETIME_FORMAT_DATE);
-        int currentYear = Integer.parseInt(now.substring(0, 4));
-        int currentMonth = Integer.parseInt(now.substring(5, 7));
-        incomeProOneList = accountService.getProOne(Constants.PRO_TYPE_INCOME, authentication.getId());
-        expendProOneList = accountService.getProOne(Constants.PRO_TYPE_EXPEND, authentication.getId());
-        BigDecimal totalAmountIn = accountService.getTotalAmountByMonth(currentYear, currentMonth, Constants.PRO_TYPE_INCOME, authentication.getId());
-        BigDecimal totalAmountOut = accountService.getTotalAmountByMonth(currentYear, currentMonth, Constants.PRO_TYPE_EXPEND, authentication.getId());
-        List<FormVm> formVmList = accountService.getFormVmByMonth(currentYear, currentMonth, authentication.getId());
+        DateTime time = new DateTime();
+        int currentYear = time.getYear();
+        int currentMonth = time.getMonthOfYear();
+        HashMap<String, String> incomeProOneList = accountService.getProOne(Constants.PRO_TYPE_INCOME, userId);
+        HashMap<String, String> expendProOneList = accountService.getProOne(Constants.PRO_TYPE_EXPEND, userId);
+        BigDecimal totalAmountIn = accountService.getTotalAmountByMonth(currentYear, currentMonth, Constants.PRO_TYPE_INCOME, userId);
+        BigDecimal totalAmountOut = accountService.getTotalAmountByMonth(currentYear, currentMonth, Constants.PRO_TYPE_EXPEND, userId);
+        List<FormVm> formVmList = accountService.getFormVmByMonth(currentYear, currentMonth, userId);
 
         LinkedList<FormToShow> formToShowLinkedList = new LinkedList<>();
         for (FormVm formVm : formVmList) {
@@ -86,27 +86,32 @@ public class AccountController {
     @RequestMapping(value = "/getProTwoList.json")
     @ResponseBody
     public GetProTwoListResponse getProTwoList(@RequestBody Map map) {
-        logger.info("AJAX异步获取对应的二级科目分类!");
-
         //解析并判断JSON
         String proOneId = (String) map.get("proOneId");
         GetProTwoListResponse response = new GetProTwoListResponse();
+        logger.info("Ajax异步获取一级科目[" + proOneId + "]对应的二级科目分类!");
         if (StringUtils.isEmpty(proOneId)) {
             response.setOpstatus(Constants.RESPONSE_FAILURE);
+            logger.info("Ajax异步获取二级科目分类失败，因为数据检查失败");
         } else {
-            logger.info("一级科目分类的ID,proOneId为:" + proOneId);
-            HashMap<String, String> proTwolist = accountService.getProTwoByProOne(proOneId);
-            response.setOpstatus(Constants.RESPONSE_SUCCESS);
-            response.setOpmap(proTwolist);
+            try {
+                HashMap<String, String> proTwolist = accountService.getProTwoByProOne(proOneId);
+                response.setOpstatus(Constants.RESPONSE_SUCCESS);
+                response.setOpmap(proTwolist);
+                logger.info("Ajax异步获取二级科目分类成功");
+            } catch (Exception e) {
+                response.setOpstatus(Constants.RESPONSE_FAILURE);
+                logger.info("Ajax异步获取二级科目分类失败，因为数据库操作失败");
+            }
         }
         return response;
     }
 
     @RequestMapping(value = "/insertForm.json", method = RequestMethod.POST)
     @ResponseBody
-    public InsertFormResponse insertForm(@RequestBody Map map, HttpServletRequest request) throws ParseException {
-        logger.info("Ajax异步提交单据");
+    public InsertFormResponse insertForm(@RequestBody Map map, HttpServletRequest request) {
 
+        InsertFormResponse response = new InsertFormResponse();
         Authentication authentication = (Authentication) request.getSession().getAttribute(Constants.SESSION);
         int userId = authentication.getId();
 
@@ -118,148 +123,20 @@ public class AccountController {
         String date = (String) map.get("date");
         String peroid = (String) map.get("peroid");
         String remark = (String) map.get("remark");
+        logger.info("Ajax异步提交单据，type:[" + type + "],amount:[" + amount + "],proOneId:[" + proOneId + "],proTwoId:[" + proTwoId + "],date:[" + date + "],peroid:[" + peroid + "],remark:[" + remark + "]");
 
-        InsertFormResponse response = new InsertFormResponse();
-
-        PfmsForm pfmsForm = transToForm(type, amount, proOneId, proTwoId, date, peroid, remark, userId);
-        accountService.insertForm(pfmsForm);
-
-        FormVm formVm = accountService.getFormVmListByCondition(null, null, null, null, null, pfmsForm.getId()).get(0);
-
-        int selectedYear = Integer.parseInt(date.substring(0, 4));
-        int seletedMonth = Integer.parseInt(date.substring(5, 7));
-
-        FormToShow formToShow = formVmToFromShow(formVm);
-        BigDecimal totalAmountIn = accountService.getTotalAmountByMonth(selectedYear, seletedMonth, Constants.PRO_TYPE_INCOME, userId);
-        BigDecimal totalAmountOut = accountService.getTotalAmountByMonth(selectedYear, seletedMonth, Constants.PRO_TYPE_EXPEND, userId);
-
-        response.setOpstatus(Constants.RESPONSE_SUCCESS);
-        response.setOpid(formToShow.getId());
-        response.setOptype(formToShow.getType());
-        response.setOpamount(formToShow.getAmount());
-        response.setOpdate(formToShow.getValueDateStr());
-        response.setOpperiod(formToShow.getPeroidStr());
-        response.setOppro(formToShow.getProOneStr() + "-" + formToShow.getProTwoStr());
-        response.setOpremark(formToShow.getRemark());
-        response.setOpselectedMonth(String.valueOf(selectedYear) + PersonalUtil.intToString(seletedMonth, 2));
-        response.setOptotalAmountIn(PersonalUtil.bigDecimalToString(totalAmountIn));
-        response.setOptotalAmountOut(PersonalUtil.bigDecimalToString(totalAmountOut));
-        return response;
-
-    }
-
-    @RequestMapping(value = "/switchMonth.json", method = RequestMethod.POST)
-    @ResponseBody
-    public SwithMonthResponse swithMonth(@RequestBody Map map, HttpServletRequest request) {
-        logger.info("更改月份");
-
-        Authentication authentication = (Authentication) request.getSession().getAttribute(Constants.SESSION);
-        int userId = authentication.getId();
-
-        //解析并判断JSON
-        String monthStr = (String) map.get("newMonth");
-
-        SwithMonthResponse response = new SwithMonthResponse();
-
-        int year = Integer.parseInt(monthStr.substring(0, 4));
-        int month = Integer.parseInt(monthStr.substring(4));
-
-        BigDecimal totalAmountIn = accountService.getTotalAmountByMonth(year, month, Constants.PRO_TYPE_INCOME, userId);
-        BigDecimal totalAmountOut = accountService.getTotalAmountByMonth(year, month, Constants.PRO_TYPE_EXPEND, userId);
-
-        response.setOpcurrentYear(String.valueOf(year));
-        response.setOpcurrentMonth(PersonalUtil.intToString(month, 2));
-        response.setOptotalAmountIn(PersonalUtil.bigDecimalToString(totalAmountIn));
-        response.setOptotalAmountOut(PersonalUtil.bigDecimalToString(totalAmountOut));
-
-        LinkedList<FormToShow> formToShowLinkedList = new LinkedList<>();
-        List<FormVm> formVmList = accountService.getFormVmByMonth(year, month, userId);
-        if (formVmList != null && formVmList.size() > 0) {
-            for (FormVm formVm : formVmList) {
-                FormToShow formToShow = formVmToFromShow(formVm);
-                formToShowLinkedList.add(formToShow);
-            }
-            response.setOpsearchResult("yes");
-        } else {
-            response.setOpsearchResult("no");
-        }
-        response.setOpformList(formToShowLinkedList);
-        response.setOpstatus(Constants.RESPONSE_SUCCESS);
-        return response;
-    }
-
-    @RequestMapping(value = "/modifyInit.json", method = RequestMethod.POST)
-    @ResponseBody
-    public ModifyInitResponse modifyInit(@RequestBody Map map, HttpServletRequest request) {
-        logger.info("修改单据初始化");
-        String id = map.get("id").toString();
-        logger.info("单据ID编号为：" + id);
-        ModifyInitResponse response = new ModifyInitResponse();
-        PfmsForm pfmsForm = accountService.getFormById(id);
-        String proOneId = pfmsForm.getUsageLevelOne();
-        if (pfmsForm != null) {
-            HashMap<String, String> proTwolist = accountService.getProTwoByProOne(proOneId);
-            response.setOpstatus(Constants.RESPONSE_SUCCESS);
-            response.setOpamount(PersonalUtil.bigDecimalToString(pfmsForm.getAmount()));
-            response.setOpproone(pfmsForm.getUsageLevelOne());
-            response.setProtwo(pfmsForm.getUsageLevelTwo());
-            response.setOpdate(PersonalUtil.getDateStr(Constants.DATETIME_FORMAT_DATE,pfmsForm.getValueDate()));
-            response.setOpperoid(pfmsForm.getTimeNo());
-            response.setOpremark(pfmsForm.getRemark());
-            response.setOpprotwolist(proTwolist);
-        } else {
-            response.setOpstatus(Constants.RESPONSE_FAILURE);
-        }
-        return response;
-    }
-
-    @RequestMapping(value = "/modifyForm.json", method = RequestMethod.POST)
-    @ResponseBody
-    public ModifyFormResponse modifyForm(@RequestBody Map map, HttpServletRequest request) throws ParseException {
-        logger.info("修改单据提交开始");
-        String id = map.get("id").toString();
-        logger.info("单据ID编号为：" + id);
-        String type = map.get("type").toString();
-        logger.info("单据类型为：" + type);
-        String amount = map.get("amount").toString();
-        logger.info("单据金额为：" + amount);
-        String proOneId = map.get("proOneId").toString();
-        logger.info("单据一级科目为：" + proOneId);
-        String proTwoId = map.get("proTwoId").toString();
-        logger.info("单据二级科目为：" + proTwoId);
-        String date = map.get("date").toString();
-        logger.info("单据日期为：" + date);
-        String peroid = map.get("peroid").toString();
-        logger.info("单据时段为：" + peroid);
-        String remark = map.get("remark").toString();
-        logger.info("单据备注为：" + remark);
-        String month = map.get("month").toString();
-        logger.info("当前页面查询月份为：" + month);
-        ModifyFormResponse response = new ModifyFormResponse();
-        Authentication authentication = (Authentication) request.getSession().getAttribute(Constants.SESSION);
-        int userId = authentication.getId();
-        PfmsForm pfmsForm = accountService.getFormById(id);
-        if (pfmsForm == null) {
-            response.setOpstatus(Constants.RESPONSE_FAILURE);
-        } else {
-            pfmsForm.setValueDate(PersonalUtil.getStrToDate(Constants.DATETIME_FORMAT_DATE,date));
-            pfmsForm.setTimeNo(peroid);
-            pfmsForm.setAmount(new BigDecimal(amount));
-            pfmsForm.setUsageLevelOne(proOneId);
-            pfmsForm.setUsageLevelTwo(proTwoId);
-            pfmsForm.setModifierId(userId);
-            pfmsForm.setModifyTime(new Date());
-            pfmsForm.setRemark(remark);
-            accountService.updateForm(pfmsForm);
+        try {
+            PfmsForm pfmsForm = transToForm(type, amount, proOneId, proTwoId, date, peroid, remark, userId);
+            accountService.insertForm(pfmsForm);
             FormVm formVm = accountService.getFormVmListByCondition(null, null, null, null, null, pfmsForm.getId()).get(0);
-            FormToShow formToShow = formVmToFromShow(formVm);
 
-            int selectedYear = Integer.parseInt(month.substring(0, 4));
-            int seletedMonth = Integer.parseInt(month.substring(4, 6));
+            int selectedYear = Integer.parseInt(date.substring(0, 4));
+            int seletedMonth = Integer.parseInt(date.substring(5, 7));
+            FormToShow formToShow = formVmToFromShow(formVm);
             BigDecimal totalAmountIn = accountService.getTotalAmountByMonth(selectedYear, seletedMonth, Constants.PRO_TYPE_INCOME, userId);
             BigDecimal totalAmountOut = accountService.getTotalAmountByMonth(selectedYear, seletedMonth, Constants.PRO_TYPE_EXPEND, userId);
-            String orderMonth = date.substring(0, 4).concat(date.substring(5, 7));
 
+            logger.info("Ajax异步提交单据成功");
             response.setOpstatus(Constants.RESPONSE_SUCCESS);
             response.setOpid(formToShow.getId());
             response.setOptype(formToShow.getType());
@@ -268,10 +145,152 @@ public class AccountController {
             response.setOpperiod(formToShow.getPeroidStr());
             response.setOppro(formToShow.getProOneStr() + "-" + formToShow.getProTwoStr());
             response.setOpremark(formToShow.getRemark());
-            response.setOpselectedMonth(orderMonth);
+            response.setOpselectedMonth(String.valueOf(selectedYear) + PersonalUtil.intToString(seletedMonth, 2));
+            response.setOptotalAmountIn(PersonalUtil.bigDecimalToString(totalAmountIn));
+            response.setOptotalAmountOut(PersonalUtil.bigDecimalToString(totalAmountOut));
+        } catch (Exception e) {
+            logger.info("Ajax异步提交单据失败");
+            response.setOpstatus(Constants.RESPONSE_FAILURE);
+        }
+        return response;
+
+    }
+
+    @RequestMapping(value = "/switchMonth.json", method = RequestMethod.POST)
+    @ResponseBody
+    public SwithMonthResponse swithMonth(@RequestBody Map map, HttpServletRequest request) {
+
+        SwithMonthResponse response = new SwithMonthResponse();
+        Authentication authentication = (Authentication) request.getSession().getAttribute(Constants.SESSION);
+        int userId = authentication.getId();
+
+        //解析并判断JSON
+        String monthStr = (String) map.get("newMonth");
+        logger.info("更改月份，目标月份为：[" + monthStr + "]");
+
+        try {
+            int year = Integer.parseInt(monthStr.substring(0, 4));
+            int month = Integer.parseInt(monthStr.substring(4));
+            BigDecimal totalAmountIn = accountService.getTotalAmountByMonth(year, month, Constants.PRO_TYPE_INCOME, userId);
+            BigDecimal totalAmountOut = accountService.getTotalAmountByMonth(year, month, Constants.PRO_TYPE_EXPEND, userId);
+
+
+            response.setOpcurrentYear(String.valueOf(year));
+            response.setOpcurrentMonth(PersonalUtil.intToString(month, 2));
             response.setOptotalAmountIn(PersonalUtil.bigDecimalToString(totalAmountIn));
             response.setOptotalAmountOut(PersonalUtil.bigDecimalToString(totalAmountOut));
 
+            LinkedList<FormToShow> formToShowLinkedList = new LinkedList<>();
+            List<FormVm> formVmList = accountService.getFormVmByMonth(year, month, userId);
+            if (formVmList != null && formVmList.size() > 0) {
+                for (FormVm formVm : formVmList) {
+                    FormToShow formToShow = formVmToFromShow(formVm);
+                    formToShowLinkedList.add(formToShow);
+                }
+                response.setOpsearchResult("yes");
+                logger.info("目标月份有单据存在");
+            } else {
+                response.setOpsearchResult("no");
+                logger.info("目标月份不存在单据");
+            }
+            response.setOpformList(formToShowLinkedList);
+            response.setOpstatus(Constants.RESPONSE_SUCCESS);
+        } catch (Exception e) {
+            logger.info("更改月份显示失败，因为数据库操作失败");
+            response.setOpstatus(Constants.RESPONSE_FAILURE);
+        }
+        return response;
+    }
+
+    @RequestMapping(value = "/modifyInit.json", method = RequestMethod.POST)
+    @ResponseBody
+    public ModifyInitResponse modifyInit(@RequestBody Map map) {
+        ModifyInitResponse response = new ModifyInitResponse();
+        String id = map.get("id").toString();
+        logger.info("修改单据初始化，单据ID编号为：" + id);
+
+        try {
+            PfmsForm pfmsForm = accountService.getFormById(id);
+            String proOneId = pfmsForm.getUsageLevelOne();
+            if (pfmsForm != null) {
+                HashMap<String, String> proTwolist = accountService.getProTwoByProOne(proOneId);
+                response.setOpstatus(Constants.RESPONSE_SUCCESS);
+                response.setOpamount(PersonalUtil.bigDecimalToString(pfmsForm.getAmount()));
+                response.setOpproone(pfmsForm.getUsageLevelOne());
+                response.setProtwo(pfmsForm.getUsageLevelTwo());
+                response.setOpdate(PersonalUtil.getDateStr(Constants.DATETIME_FORMAT_DATE, pfmsForm.getValueDate()));
+                response.setOpperoid(pfmsForm.getTimeNo());
+                response.setOpremark(pfmsForm.getRemark());
+                response.setOpprotwolist(proTwolist);
+                logger.info("修改单据的查询成功");
+            } else {
+                response.setOpstatus(Constants.RESPONSE_FAILURE);
+                logger.info("修改单据的查询失败");
+            }
+        } catch (Exception e) {
+            response.setOpstatus(Constants.RESPONSE_FAILURE);
+            logger.info("修改单据的查询失败");
+        }
+        return response;
+    }
+
+    @RequestMapping(value = "/modifyForm.json", method = RequestMethod.POST)
+    @ResponseBody
+    public ModifyFormResponse modifyForm(@RequestBody Map map, HttpServletRequest request) throws ParseException {
+        ModifyFormResponse response = new ModifyFormResponse();
+        //解析并判断JSON
+        String id = map.get("id").toString();
+        String type = map.get("type").toString();
+        String amount = map.get("amount").toString();
+        String proOneId = map.get("proOneId").toString();
+        String proTwoId = map.get("proTwoId").toString();
+        String date = map.get("date").toString();
+        String peroid = map.get("peroid").toString();
+        String remark = map.get("remark").toString();
+        String month = map.get("month").toString();
+        logger.info("修改单据提交开始，id:[" + id + "],type:[" + type + "],amount:[" + amount + "],proOneId:[" + proOneId + "],proTwoId:[" + proTwoId + "],date:[" + date + "],peroid:[" + peroid + "],remark:[" + remark + "],month:[" + month + "]");
+        Authentication authentication = (Authentication) request.getSession().getAttribute(Constants.SESSION);
+        int userId = authentication.getId();
+        try {
+            PfmsForm pfmsForm = accountService.getFormById(id);
+            if (pfmsForm == null) {
+                response.setOpstatus(Constants.RESPONSE_FAILURE);
+                logger.info("修改单据失败，原因是对应单据在数据库中不存在");
+            } else {
+                pfmsForm.setValueDate(PersonalUtil.getStrToDate(date, Constants.DATETIME_FORMAT_DATE));
+                pfmsForm.setTimeNo(peroid);
+                pfmsForm.setAmount(new BigDecimal(amount));
+                pfmsForm.setUsageLevelOne(proOneId);
+                pfmsForm.setUsageLevelTwo(proTwoId);
+                pfmsForm.setModifierId(userId);
+                pfmsForm.setModifyTime(new Date());
+                pfmsForm.setRemark(remark);
+                accountService.updateForm(pfmsForm);
+                FormVm formVm = accountService.getFormVmListByCondition(null, null, null, null, null, pfmsForm.getId()).get(0);
+                FormToShow formToShow = formVmToFromShow(formVm);
+
+                int selectedYear = Integer.parseInt(month.substring(0, 4));
+                int seletedMonth = Integer.parseInt(month.substring(4, 6));
+                BigDecimal totalAmountIn = accountService.getTotalAmountByMonth(selectedYear, seletedMonth, Constants.PRO_TYPE_INCOME, userId);
+                BigDecimal totalAmountOut = accountService.getTotalAmountByMonth(selectedYear, seletedMonth, Constants.PRO_TYPE_EXPEND, userId);
+                String orderMonth = date.substring(0, 4).concat(date.substring(5, 7));
+
+                logger.info("修改单据成功");
+                response.setOpstatus(Constants.RESPONSE_SUCCESS);
+                response.setOpid(formToShow.getId());
+                response.setOptype(formToShow.getType());
+                response.setOpamount(formToShow.getAmount());
+                response.setOpdate(formToShow.getValueDateStr());
+                response.setOpperiod(formToShow.getPeroidStr());
+                response.setOppro(formToShow.getProOneStr() + "-" + formToShow.getProTwoStr());
+                response.setOpremark(formToShow.getRemark());
+                response.setOpselectedMonth(orderMonth);
+                response.setOptotalAmountIn(PersonalUtil.bigDecimalToString(totalAmountIn));
+                response.setOptotalAmountOut(PersonalUtil.bigDecimalToString(totalAmountOut));
+            }
+        } catch (Exception e) {
+            response.setOpstatus(Constants.RESPONSE_FAILURE);
+            logger.info("修改单据失败");
         }
         return response;
     }
@@ -279,36 +298,40 @@ public class AccountController {
     @RequestMapping(value = "/deleteForm.json", method = RequestMethod.POST)
     @ResponseBody
     public DeleteFormResponse deleteForm(@RequestBody Map map, HttpServletRequest request) {
-        logger.info("删除单据开始");
-        String id = map.get("id").toString();
-        logger.info("单据ID编号为：" + id);
-        String type = map.get("type").toString();
-        logger.info("单据类型为：" + type);
-        String month = map.get("month").toString();
-        logger.info("当前页面查询月份为：" + month);
         DeleteFormResponse response = new DeleteFormResponse();
+        //解析并判断JSON
+        String id = map.get("id").toString();
+        String type = map.get("type").toString();
+        String month = map.get("month").toString();
+        logger.info("删除单据开始，id:[" + id + "],type:[" + type + "],month:[" + month + "]");
         Authentication authentication = (Authentication) request.getSession().getAttribute(Constants.SESSION);
         int userId = authentication.getId();
-        accountService.deleteForm(id);
-        int selectedYear = Integer.parseInt(month.substring(0, 4));
-        int seletedMonth = Integer.parseInt(month.substring(4, 6));
-        BigDecimal totalAmountIn = accountService.getTotalAmountByMonth(selectedYear, seletedMonth, Constants.PRO_TYPE_INCOME, userId);
-        BigDecimal totalAmountOut = accountService.getTotalAmountByMonth(selectedYear, seletedMonth, Constants.PRO_TYPE_EXPEND, userId);
-        int count = accountService.getMonthOrderCount(selectedYear, seletedMonth, userId);
 
-        response.setOpstatus(Constants.RESPONSE_SUCCESS);
-        response.setOpid(id);
-        response.setOptype(type);
-        response.setCount(count);
-        response.setOptotalAmountIn(PersonalUtil.bigDecimalToString(totalAmountIn));
-        response.setOptotalAmountOut(PersonalUtil.bigDecimalToString(totalAmountOut));
+        try {
+            accountService.deleteForm(id);
+            int selectedYear = Integer.parseInt(month.substring(0, 4));
+            int seletedMonth = Integer.parseInt(month.substring(4, 6));
+            BigDecimal totalAmountIn = accountService.getTotalAmountByMonth(selectedYear, seletedMonth, Constants.PRO_TYPE_INCOME, userId);
+            BigDecimal totalAmountOut = accountService.getTotalAmountByMonth(selectedYear, seletedMonth, Constants.PRO_TYPE_EXPEND, userId);
+            int count = accountService.getMonthOrderCount(selectedYear, seletedMonth, userId);
+
+            logger.info("删除单据成功");
+            response.setOpstatus(Constants.RESPONSE_SUCCESS);
+            response.setOpid(id);
+            response.setOptype(type);
+            response.setCount(count);
+            response.setOptotalAmountIn(PersonalUtil.bigDecimalToString(totalAmountIn));
+            response.setOptotalAmountOut(PersonalUtil.bigDecimalToString(totalAmountOut));
+        } catch (Exception e) {
+            response.setOpstatus(Constants.RESPONSE_FAILURE);
+            logger.info("删除单据失败");
+        }
         return response;
     }
 
     public PfmsForm transToForm(String type, String amount, String proOneId, String proTwoId, String date, String peroid, String remark, int userId) throws ParseException {
 
         String id = sequenceService.getId(Constants.SEQ_FORMID);
-
         PfmsForm pfmsForm = new PfmsForm();
         pfmsForm.setId(id);
         pfmsForm.setType(type);
@@ -369,5 +392,13 @@ public class AccountController {
                 break;
         }
         return periodStr;
+    }
+
+    public static void main(String[] args) {
+        DateTime time = new DateTime();
+        int year = time.getYear();
+        int month = time.getMonthOfYear();
+        System.out.println("year:" + year);
+        System.out.println("month:" + month);
     }
 }

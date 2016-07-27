@@ -4,11 +4,14 @@ import com.pfms.biz.service.IAccountService;
 import com.pfms.biz.service.ISequenceService;
 import com.pfms.dal.mybatis.dao.*;
 import com.pfms.dal.mybatis.model.*;
+import com.pfms.util.Constants;
+import com.pfms.util.PersonalUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
@@ -24,24 +27,19 @@ public class AccountServiceImp implements IAccountService {
 
     @Autowired
     PfmsFormMapper pfmsFormMapper;
-
     @Autowired
     PfmsUsageLevelOneMapper pfmsUsageLevelOneMapper;
-
     @Autowired
     PfmsUsageLevelTwoMapper pfmsUsageLevelTwoMapper;
-
     @Autowired
     CustomMapper customMapper;
-
     @Autowired
     FormVmMapper formVmMapper;
-
     @Autowired
     ISequenceService sequenceService;
 
     public HashMap getProOne(String type, int userId) {
-        logger.info("开始获取用户ID为[" + userId + "],TYPE为[" + type + "]的一级科目分类!");
+        logger.info("获取用户ID为[" + userId + "],TYPE为[" + type + "]的一级科目分类!");
 
         LinkedHashMap<String, String> proOneTmp = new LinkedHashMap<String, String>();
         PfmsUsageLevelOneExample pfmsUsageLevelOneExample = new PfmsUsageLevelOneExample();
@@ -57,7 +55,7 @@ public class AccountServiceImp implements IAccountService {
     }
 
     public HashMap getProTwoByProOne(String proOneId) {
-        logger.info("开始获取父ID为[" + proOneId + "]的二级科目分类");
+        logger.info("根据一级科目["+ proOneId +"]获取其二级科目列表");
 
         LinkedHashMap<String, String> proTwoTmp = new LinkedHashMap<String, String>();
         PfmsUsageLevelTwoExample pfmsUsageLevelTwoExample = new PfmsUsageLevelTwoExample();
@@ -72,9 +70,9 @@ public class AccountServiceImp implements IAccountService {
         return proTwoTmp;
     }
 
+    @Transactional
     public void insertForm(PfmsForm pfmsForm) {
-        logger.info("开始向数据库中插入新的单据记录");
-
+        logger.info("开始向数据库中插入新的单据记录，ID为["+ pfmsForm.getId() +"]");
         pfmsFormMapper.insert(pfmsForm);
     }
 
@@ -83,72 +81,51 @@ public class AccountServiceImp implements IAccountService {
     }
 
     public PfmsForm getFormById(String formId) {
+        logger.info("根据单据ID["+ formId +"]获取单据详细信息");
         PfmsFormExample pfmsFormExample = new PfmsFormExample();
         pfmsFormExample.createCriteria().andIdEqualTo(formId);
         List<PfmsForm> pfmsForms = pfmsFormMapper.selectByExample(pfmsFormExample);
         if (pfmsForms.size() != 1) {
+            logger.info("数据库查询得到的单据列表大小不为1，返回NULL");
             return null;
         } else {
             return pfmsForms.get(0);
         }
     }
 
+    @Transactional
     public void updateForm(PfmsForm pfmsForm) {
+        logger.info("更新记账单据，ID为["+ pfmsForm.getId() +"]");
         pfmsFormMapper.updateByPrimaryKeySelective(pfmsForm);
     }
 
+    @Transactional
     public void deleteForm(String id) {
+        logger.info("删除记账单据，ID为["+ id +"]");
         pfmsFormMapper.deleteByPrimaryKey(id);
     }
 
     //获取指定月份的相应金额总和 type-1为收入,type-2为支出
     public BigDecimal getTotalAmountByMonth(int year, int month, String type, int creatorId) {
-        Date firstDate = getDateOfMonth(year, month, "B");
-        Date lastDate = getDateOfMonth(year, month, "L");
-        HashMap queryParam = new HashMap();
-        queryParam.put("type", type);
-        queryParam.put("firstDate", firstDate);
-        queryParam.put("lastDate", lastDate);
-        BigDecimal sumAmount = customMapper.selTotAmtByMon(type, firstDate, lastDate, creatorId);
-        return sumAmount;
+        Date firstDate = PersonalUtil.getDateOfMonth(year, month, Constants.DAY_OF_MONTH_BEGIN);
+        Date lastDate = PersonalUtil.getDateOfMonth(year, month, Constants.DAY_OF_MONTH_END);
+        logger.info("获取创建者为["+ creatorId +"],valueDateTime从["+PersonalUtil.getDateStr("yyyy-MM-dd HH:mm:ss",firstDate)+"]到["+PersonalUtil.getDateStr("yyyy-MM-dd HH:mm:ss",lastDate)+"]的所有type为["+type+"]的单据金额之和");
+        return customMapper.selTotAmtByMon(type, firstDate, lastDate, creatorId);
     }
 
     //获取指定月份记录的收支单据流水
     public List<FormVm> getFormVmByMonth(int year, int month, int creatorId) {
-        Date firstDate = getDateOfMonth(year, month, "B");
-        Date lastDate = getDateOfMonth(year, month, "L");
+        logger.info("获取创建者为["+ creatorId +"],["+ year + "/"+ PersonalUtil.intToString(month,2) +"]月份的所有收支记录");
+        Date firstDate = PersonalUtil.getDateOfMonth(year, month, Constants.DAY_OF_MONTH_BEGIN);
+        Date lastDate = PersonalUtil.getDateOfMonth(year, month, Constants.DAY_OF_MONTH_END);
         FormVmExample formVmExample = new FormVmExample();
         formVmExample.createCriteria().andValueDateBetween(firstDate, lastDate).andCreatorIdEqualTo(creatorId);
-        formVmExample.setOrderByClause("VALUE_DATE DESC");
-        List<FormVm> formVmList = formVmMapper.selectByExample(formVmExample);
-        return formVmList;
-    }
-
-    public Date getDateOfMonth(int year, int month, String type) {
-        Date date;
-        Calendar calendar = Calendar.getInstance();
-        calendar.set(Calendar.YEAR, year);
-        calendar.set(Calendar.MONTH, month - 1);
-        if ("B".equals(type)) {
-            calendar.set(Calendar.DAY_OF_MONTH, 1);
-            calendar.set(Calendar.HOUR_OF_DAY, 0);
-            calendar.set(Calendar.MINUTE, 0);
-            calendar.set(Calendar.SECOND, 0);
-            calendar.set(Calendar.MILLISECOND, 0);
-            date = calendar.getTime();
-        } else {
-            int lastDay = calendar.getActualMaximum(Calendar.DAY_OF_MONTH);
-            calendar.set(Calendar.DAY_OF_MONTH, lastDay);
-            calendar.set(Calendar.HOUR_OF_DAY, 23);
-            calendar.set(Calendar.MINUTE, 59);
-            calendar.set(Calendar.SECOND, 59);
-            calendar.set(Calendar.MILLISECOND, 999);
-            date = calendar.getTime();
-        }
-        return date;
+        formVmExample.setOrderByClause("VALUE_DATE DESC, TIME_NO DESC");
+        return formVmMapper.selectByExample(formVmExample);
     }
 
     public List<FormVm> getFormVmListByCondition(String type, Date beginDate, Date endDate, String proOneId, String proTwoId, String id) {
+        logger.info("根据条件获取收支记录视图列表");
         FormVmExample formVmExample = new FormVmExample();
         FormVmExample.Criteria criteria = formVmExample.createCriteria();
         if (type != null && ("1".equals(type) || "2".equals(type))) {
@@ -171,15 +148,11 @@ public class AccountServiceImp implements IAccountService {
     }
 
     public int getMonthOrderCount(int selectedYear, int seletedMonth, int userId) {
-        Calendar beginTime = Calendar.getInstance();
-        Calendar endTime = Calendar.getInstance();
-        beginTime.set(selectedYear, seletedMonth - 1, 1, 0, 0, 0);
-        beginTime.set(Calendar.MILLISECOND, 0);
-        endTime.set(selectedYear, seletedMonth, 1, 0, 0, 0);
-        endTime.set(Calendar.MILLISECOND, 0);
+        logger.info("获取创建者为["+ userId +"],["+ selectedYear + "/"+ PersonalUtil.intToString(seletedMonth,2) +"]月份的所有收支记录的数量");
+        Date beginTime = PersonalUtil.getDateOfMonth(selectedYear,seletedMonth, Constants.DAY_OF_MONTH_BEGIN);
+        Date endTime = PersonalUtil.getDateOfMonth(selectedYear,seletedMonth,Constants.DAY_OF_MONTH_END);
         PfmsFormExample pfmsFormExample = new PfmsFormExample();
-        pfmsFormExample.createCriteria().andValueDateBetween(beginTime.getTime(), endTime.getTime()).andCreatorIdEqualTo(userId);
-        int count = pfmsFormMapper.countByExample(pfmsFormExample);
-        return count;
+        pfmsFormExample.createCriteria().andValueDateBetween(beginTime, endTime).andCreatorIdEqualTo(userId);
+        return pfmsFormMapper.countByExample(pfmsFormExample);
     }
 }
